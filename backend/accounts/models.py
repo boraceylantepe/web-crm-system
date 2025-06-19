@@ -3,6 +3,16 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.utils.translation import gettext_lazy as _
+import os
+
+def user_profile_picture_path(instance, filename):
+    """Generate file path for user profile pictures."""
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Create filename as user_id.extension
+    filename = f"user_{instance.id}.{ext}"
+    # Return the full path
+    return os.path.join('profile_pictures', filename)
 
 class UserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -52,6 +62,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(_('first name'), max_length=150, blank=True)
     last_name = models.CharField(_('last name'), max_length=150, blank=True)
     username = models.CharField(_('username'), max_length=150, blank=True)
+    
+    # Profile picture field
+    profile_picture = models.ImageField(
+        upload_to=user_profile_picture_path,
+        blank=True,
+        null=True,
+        help_text=_('Upload a profile picture')
+    )
+    
     is_staff = models.BooleanField(
         _('staff status'),
         default=False,
@@ -99,6 +118,12 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.is_staff = True
         
         super().save(*args, **kwargs)
+    
+    def get_profile_picture_url(self):
+        """Get the URL for the user's profile picture."""
+        if self.profile_picture:
+            return self.profile_picture.url
+        return None
     
     def is_password_expired(self):
         """Check if the user's password has expired."""

@@ -78,7 +78,7 @@ const TaskDetail = () => {
     };
 
     const isAssignedToMe = task && user?.id === task.assigned_to;
-    const isManager = user?.is_staff || user?.role === 'ADMIN';
+    const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
     const canChangeStatus = isAssignedToMe || isManager;
 
     if (loading) {

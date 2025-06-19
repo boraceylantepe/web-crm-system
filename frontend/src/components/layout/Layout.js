@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { Outlet, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -17,9 +17,18 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  TextField,
+  InputAdornment,
+  Switch,
+  FormControlLabel,
+  Collapse,
+  Badge,
+  Paper,
+  ListSubheader,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
+  MenuOpen as MenuOpenIcon,
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   AttachMoney as SalesIcon,
@@ -27,36 +36,67 @@ import {
   Event as CalendarIcon,
   ManageAccounts as UserManagementIcon,
   Assessment as AnalyticsIcon,
+  Description as ReportsIcon,
+  Search as SearchIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
+  ExpandLess,
+  ExpandMore,
+  Settings as SettingsIcon,
+  Notifications as NotificationsIcon,
+  AccountBox as ProfileIcon,
+  Logout as LogoutIcon,
+  Translate as TranslateIcon,
 } from '@mui/icons-material';
 import { AuthContext } from '../../context/AuthContext';
 import PasswordChange from '../auth/PasswordChange';
 import NotificationMenu from '../notifications/NotificationMenu';
 
-const drawerWidth = 240;
+const drawerWidth = 280; // Increased drawer width for better spacing
 
-const baseMenuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
-  { text: 'Sales', icon: <SalesIcon />, path: '/sales' },
-  { text: 'Tasks', icon: <TaskIcon />, path: '/tasks' },
-  { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
-  { text: 'Reports', icon: <AnalyticsIcon />, path: '/reports' },
+// Main navigation items
+const mainMenuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/', section: 'main', badge: 5 },
+];
+
+// Apps section items
+const appsMenuItems = [
+  { text: 'Customers', icon: <PeopleIcon />, path: '/customers', section: 'apps' },
+  { text: 'Sales', icon: <SalesIcon />, path: '/sales', section: 'apps' },
+  { text: 'Tasks', icon: <TaskIcon />, path: '/tasks', section: 'apps' },
+  { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar', section: 'apps' },
+  { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications', section: 'apps', badge: 3 },
+];
+
+// Analytics & Reports section
+const analyticsMenuItems = [
+  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics', section: 'analytics' },
+  { text: 'Reports', icon: <ReportsIcon />, path: '/reports', section: 'analytics' },
 ];
 
 // Admin and Manager only menu items
 const adminMenuItems = [
-  { text: 'Users', icon: <UserManagementIcon />, path: '/users' },
+  { text: 'User Management', icon: <UserManagementIcon />, path: '/users', section: 'admin' },
 ];
 
 const Layout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    main: true,
+    apps: true,
+    analytics: true,
+    admin: true
+  });
+  
   const { user, logout, passwordChangeRequired, isAdminOrManager } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Show password dialog when required
   useEffect(() => {
     if (passwordChangeRequired) {
       setPasswordDialogOpen(true);
@@ -65,6 +105,10 @@ const Layout = () => {
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   const handleMenuOpen = (event) => {
@@ -86,33 +130,178 @@ const Layout = () => {
     setPasswordDialogOpen(true);
   };
 
-  // Determine which menu items to show based on user role
-  const menuItems = [...baseMenuItems];
-  
-  // Add admin menu items for ADMIN and MANAGER roles
-  if (isAdminOrManager) {
-    menuItems.push(...adminMenuItems);
-  }
+  const handleProfile = () => {
+    handleMenuClose();
+    navigate('/profile');
+  };
 
-  const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          CRM System
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
+  const handleSectionToggle = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const isActiveRoute = (path) => {
+    return location.pathname === path || 
+           (path !== '/' && location.pathname.startsWith(path));
+  };
+
+  const renderNavSection = (title, items, section, collapsible = false) => {
+    const isExpanded = expandedSections[section] !== false;
+    
+    return (
+      <React.Fragment key={section}>
+        {collapsible ? (
+          <ListItemButton 
+            onClick={() => handleSectionToggle(section)}
+            sx={{ mx: 1, borderRadius: 1 }}
+          >
+            <ListItemText 
+              primary={title}
+              primaryTypographyProps={{
+                variant: 'caption',
+                sx: { 
+                  fontWeight: 'bold',
+                  color: 'text.secondary',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1
+                }
+              }}
+            />
+            {isExpanded ? <ExpandLess /> : <ExpandMore />}
+          </ListItemButton>
+        ) : (
+          <ListSubheader
+            component="div"
+            sx={{
+              bgcolor: 'transparent',
+              color: 'text.secondary',
+              fontWeight: 'bold',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              py: 1,
+              px: 2
+            }}
+          >
+            {title}
+          </ListSubheader>
+        )}
+        
+        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+          {items.map((item) => (
           <ListItem key={item.text} disablePadding>
-            <ListItemButton component={Link} to={item.path}>
-              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemButton 
+                component={Link} 
+                to={item.path}
+                selected={isActiveRoute(item.path)}
+                sx={{
+                  borderRadius: 1,
+                  mx: 1,
+                  my: 0.5,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.contrastText',
+                    }
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  {item.badge ? (
+                    <Badge badgeContent={item.badge} color="error">
+                      {item.icon}
+                    </Badge>
+                  ) : (
+                    item.icon
+                  )}
+                </ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>
           </ListItem>
         ))}
+        </Collapse>
+      </React.Fragment>
+    );
+  };
+
+  const drawer = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Toolbar sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Avatar
+            sx={{
+              bgcolor: 'primary.main',
+              width: 32,
+              height: 32,
+              mr: 2,
+              fontSize: '1rem',
+              fontWeight: 'bold'
+            }}
+          >
+            C
+          </Avatar>
+          <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+            CRM System
+          </Typography>
+        </Box>
+      </Toolbar>
+      
+      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <List sx={{ pt: 2 }}>
+          {renderNavSection('MAIN', mainMenuItems, 'main')}
+          
+          <Divider sx={{ my: 2 }} />
+          {renderNavSection('APPS', appsMenuItems, 'apps')}
+          
+          <Divider sx={{ my: 2 }} />
+          {renderNavSection('ANALYTICS', analyticsMenuItems, 'analytics', true)}
+          
+          {isAdminOrManager && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              {renderNavSection('ADMINISTRATION', adminMenuItems, 'admin', true)}
+            </>
+          )}
       </List>
-    </div>
+      </Box>
+      
+      {/* User info at bottom */}
+      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar 
+            src={user?.profile_picture_url ? (() => {
+              let imageUrl = user.profile_picture_url;
+              if (imageUrl.startsWith('/media/')) {
+                imageUrl = `http://localhost:8000${imageUrl}`;
+              }
+              return imageUrl.includes('?') ? `${imageUrl}&t=${Date.now()}` : `${imageUrl}?t=${Date.now()}`;
+            })() : undefined} 
+            sx={{ 
+              width: 40, 
+              height: 40,
+              mr: 1.5,
+              bgcolor: user?.profile_picture_url ? 'transparent' : 'secondary.main' 
+            }}
+          >
+            {!user?.profile_picture_url && (user?.first_name?.[0] || user?.username?.[0] || 'U')}
+          </Avatar>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 'medium' }}>
+              {user?.first_name} {user?.last_name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {user?.role || 'User'}
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
   );
 
   return (
@@ -120,12 +309,25 @@ const Layout = () => {
       <CssBaseline />
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { 
+            xs: '100%',
+            sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : '100%'
+          },
+          ml: { 
+            xs: 0,
+            sm: sidebarOpen ? `${drawerWidth}px` : 0
+          },
+          transition: 'width 0.3s, margin 0.3s',
+          borderBottom: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          color: 'text.primary'
         }}
       >
         <Toolbar>
+          {/* Mobile menu button */}
           <IconButton
             color="inherit"
             aria-label="open drawer"
@@ -135,15 +337,71 @@ const Layout = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            CRM Dashboard
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body1" sx={{ mr: 2 }}>
-              {user?.first_name} {user?.last_name}
-            </Typography>
-            {/* Notification Icon */}
+          
+          {/* Desktop sidebar toggle button */}
+          <IconButton
+            color="inherit"
+            aria-label="toggle sidebar"
+            edge="start"
+            onClick={handleSidebarToggle}
+            sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}
+          >
+            {sidebarOpen ? <MenuOpenIcon /> : <MenuIcon />}
+          </IconButton>
+
+          {/* Search bar */}
+          <TextField
+            size="small"
+            placeholder="Search here..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              width: { xs: 200, md: 300 },
+              mr: 2,
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'background.default',
+                '&:hover': {
+                  bgcolor: 'background.default',
+                },
+              }
+            }}
+          />
+
+          <Box sx={{ flexGrow: 1 }} />
+          
+          {/* Action buttons */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          
+            {/* Theme toggle */}
+            <IconButton
+              color="inherit"
+              onClick={() => setDarkMode(!darkMode)}
+              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+
+            {/* Calendar shortcut */}
+            <IconButton
+              color="inherit"
+              component={Link}
+              to="/calendar"
+              title="Calendar"
+            >
+              <CalendarIcon />
+            </IconButton>
+
+            {/* Notifications */}
             <NotificationMenu />
+
+            {/* Profile menu */}
             <IconButton
               size="large"
               edge="end"
@@ -153,48 +411,78 @@ const Layout = () => {
               onClick={handleMenuOpen}
               color="inherit"
             >
-              <Avatar>{user?.first_name?.[0] || user?.username?.[0] || 'U'}</Avatar>
+              <Avatar 
+                src={user?.profile_picture_url ? (() => {
+                  let imageUrl = user.profile_picture_url;
+                  if (imageUrl.startsWith('/media/')) {
+                    imageUrl = `http://localhost:8000${imageUrl}`;
+                  }
+                  return imageUrl.includes('?') ? `${imageUrl}&t=${Date.now()}` : `${imageUrl}?t=${Date.now()}`;
+                })() : undefined} 
+                sx={{ 
+                  width: 32, 
+                  height: 32,
+                  bgcolor: user?.profile_picture_url ? 'transparent' : 'secondary.main' 
+                }}
+              >
+                {!user?.profile_picture_url && (user?.first_name?.[0] || user?.username?.[0] || 'U')}
+              </Avatar>
             </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* Profile Menu */}
             <Menu
-              id="menu-appbar"
               anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
               anchorOrigin={{
                 vertical: 'bottom',
                 horizontal: 'right',
               }}
-              keepMounted
               transformOrigin={{
                 vertical: 'top',
                 horizontal: 'right',
               }}
-              open={Boolean(anchorEl)}
-              onClose={handleMenuClose}
+        PaperProps={{
+          sx: { mt: 1, minWidth: 200 }
+        }}
             >
-              <MenuItem component={Link} to="/profile" onClick={handleMenuClose}>
-                Profile
+        <MenuItem onClick={handleProfile}>
+          <ListItemIcon>
+            <ProfileIcon />
+          </ListItemIcon>
+          <ListItemText>Profile</ListItemText>
               </MenuItem>
               <MenuItem onClick={handlePasswordChange}>
-                Change Password
+          <ListItemIcon>
+            <SettingsIcon />
+          </ListItemIcon>
+          <ListItemText>Change Password</ListItemText>
               </MenuItem>
-              <MenuItem component={Link} to="/notifications/settings" onClick={handleMenuClose}>
-                Notification Settings
+        <Divider />
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon>
+            <LogoutIcon />
+          </ListItemIcon>
+          <ListItemText>Logout</ListItemText>
               </MenuItem>
-              <MenuItem onClick={handleLogout}>Logout</MenuItem>
             </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
+
+      {/* Sidebar drawer */}
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        sx={{ width: { sm: sidebarOpen ? drawerWidth : 0 }, flexShrink: { sm: 0 } }}
+        aria-label="navigation folders"
       >
+        {/* Mobile drawer */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
@@ -203,20 +491,37 @@ const Layout = () => {
         >
           {drawer}
         </Drawer>
+        
+        {/* Desktop drawer */}
         <Drawer
-          variant="permanent"
+          variant="persistent"
+          open={sidebarOpen}
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: 1,
+              borderColor: 'divider'
+            },
           }}
-          open
         >
           {drawer}
         </Drawer>
       </Box>
+
+      {/* Main content */}
       <Box
         component="main"
-        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
+        sx={{ 
+          flexGrow: 1, 
+          p: 3, 
+          width: { 
+            xs: '100%',
+            sm: sidebarOpen ? `calc(100% - ${drawerWidth}px)` : '100%'
+          },
+          transition: 'width 0.3s'
+        }}
       >
         <Toolbar />
         <Outlet />

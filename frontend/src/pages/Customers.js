@@ -25,13 +25,21 @@ import {
   Chip,
   Card,
   CardContent,
+  CardHeader,
   Collapse,
   Menu,
   MenuItem,
   FormControl,
   InputLabel,
   Select,
-  Divider
+  Divider,
+  Breadcrumbs,
+  Link,
+  Avatar,
+  Checkbox,
+  Toolbar,
+  Stack,
+  Badge
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -45,23 +53,32 @@ import {
   Phone as PhoneIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  MoreVert as MoreVertIcon
+  MoreVert as MoreVertIcon,
+  Visibility as VisibilityIcon,
+  NavigateNext as NavigateNextIcon,
+  Home as HomeIcon,
+  Clear as ClearIcon,
+  AccessTime as AccessTimeIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { getCustomers, searchCustomers, deleteCustomer } from '../services/customerService';
+import { formatDate } from '../utils/dateUtils';
 
 const Customers = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const [selected, setSelected] = useState([]);
   const [filters, setFilters] = useState({
     region: '',
     engagement_level: '',
     status: '',
-    is_active: true
+    is_active: 'all',
+    time_period: 'all'
   });
   
   // Pagination
@@ -71,6 +88,7 @@ const Customers = () => {
   // Dialog states
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   
   // Menu for customer actions
   const [actionMenu, setActionMenu] = useState(null);
@@ -89,14 +107,23 @@ const Customers = () => {
         offset: page * rowsPerPage
       };
       
+      // Remove 'all' values from filters
+      Object.keys(params).forEach(key => {
+        if (params[key] === 'all' || params[key] === '') {
+          delete params[key];
+        }
+      });
+      
       // Use search endpoint if a search query exists
-      if (searchQuery) {
-        params.q = searchQuery;
+      if (searchQuery.trim()) {
+        params.q = searchQuery.trim();
         const data = await searchCustomers(params);
-        setCustomers(data);
+        setCustomers(Array.isArray(data.results) ? data.results : data);
+        setTotalCount(data.count || data.length || 0);
       } else {
         const data = await getCustomers(params);
         setCustomers(Array.isArray(data.results) ? data.results : data);
+        setTotalCount(data.count || data.length || 0);
       }
     } catch (err) {
       setError('Failed to fetch customers. Please try again.');
@@ -108,6 +135,7 @@ const Customers = () => {
   
   const handleSearch = (e) => {
     e.preventDefault();
+    setPage(0);
     fetchCustomers();
   };
   
@@ -117,7 +145,19 @@ const Customers = () => {
       ...filters,
       [name]: value
     });
-    setPage(0); // Reset to first page when filters change
+    setPage(0);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      region: '',
+      engagement_level: '',
+      status: '',
+      is_active: 'all',
+      time_period: 'all'
+    });
+    setSearchQuery('');
+    setPage(0);
   };
   
   const handleChangePage = (event, newPage) => {
@@ -128,39 +168,68 @@ const Customers = () => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      setSelected(customers.map(customer => customer.id));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectOne = (customerId) => {
+    setSelected(prev => {
+      if (prev.includes(customerId)) {
+        return prev.filter(id => id !== customerId);
+      } else {
+        return [...prev, customerId];
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    setBulkDeleteOpen(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    try {
+      await Promise.all(selected.map(id => deleteCustomer(id)));
+      setCustomers(customers.filter(c => !selected.includes(c.id)));
+      setSelected([]);
+      setBulkDeleteOpen(false);
+    } catch (err) {
+      setError('Failed to delete selected customers. Please try again.');
+    }
+  };
   
   const handleAddCustomer = () => {
     navigate('/customers/add');
   };
   
   const handleEditCustomer = (customer) => {
+    setActionMenu(null);
     navigate(`/customers/edit/${customer.id}`);
-    handleCloseActionMenu();
   };
   
   const handleViewCustomer = (customer) => {
+    setActionMenu(null);
     navigate(`/customers/${customer.id}`);
-    handleCloseActionMenu();
   };
   
   const handleDeleteClick = (customer) => {
     setCustomerToDelete(customer);
     setConfirmDeleteOpen(true);
-    handleCloseActionMenu();
+    setActionMenu(null);
   };
   
   const handleConfirmDelete = async () => {
-    if (!customerToDelete) return;
-    
     try {
       await deleteCustomer(customerToDelete.id);
-      // Remove the deleted customer from the state
       setCustomers(customers.filter(c => c.id !== customerToDelete.id));
       setConfirmDeleteOpen(false);
       setCustomerToDelete(null);
     } catch (err) {
-      setError('Failed to delete the customer. Please try again.');
-      console.error('Error deleting customer:', err);
+      setError('Failed to delete customer. Please try again.');
     }
   };
   
@@ -179,279 +248,413 @@ const Customers = () => {
     setSelectedCustomer(null);
   };
   
-  // Get engagement level color
   const getEngagementLevelColor = (level) => {
-    switch (level) {
-      case 'LOW':
-        return 'info';
-      case 'MEDIUM':
-        return 'success';
-      case 'HIGH':
-        return 'warning';
-      case 'VIP':
-        return 'error';
-      default:
-        return 'default';
+    switch(level?.toLowerCase()) {
+      case 'high': return 'success';
+      case 'medium': return 'warning';
+      case 'low': return 'error';
+      default: return 'default';
     }
   };
   
-  // Get status color
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'success';
-      case 'INACTIVE':
-        return 'error';
-      case 'LEAD':
-        return 'info';
-      case 'PROSPECT':
-        return 'warning';
-      default:
-        return 'default';
+    switch(status?.toLowerCase()) {
+      case 'active': return 'success';
+      case 'inactive': return 'default';
+      case 'prospect': return 'info';
+      case 'lead': return 'warning';
+      default: return 'default';
     }
   };
   
   return (
-    <Container maxWidth="lg">
-      <Box my={4}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4" component="h1" gutterBottom>
+    <Box sx={{ flexGrow: 1 }}>
+      {/* Breadcrumbs */}
+      <Box sx={{ mb: 3 }}>
+        <Breadcrumbs 
+          aria-label="breadcrumb"
+          separator={<NavigateNextIcon fontSize="small" />}
+        >
+          <Link 
+            component={RouterLink} 
+            to="/" 
+            color="inherit" 
+            sx={{ display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}
+          >
+            <HomeIcon fontSize="small" />
+            Dashboard
+          </Link>
+          <Typography color="text.primary" sx={{ fontWeight: 'medium' }}>
+            Customers
+          </Typography>
+        </Breadcrumbs>
+      </Box>
+
+      {/* Page Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
             Customers
           </Typography>
           <Button
             variant="contained"
-            color="primary"
             startIcon={<AddIcon />}
             onClick={handleAddCustomer}
+          sx={{ textTransform: 'none' }}
           >
             Add Customer
           </Button>
         </Box>
         
         {/* Search and Filters */}
-        <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-          <Box component="form" onSubmit={handleSearch} sx={{ mb: 2 }}>
+      <Card elevation={0} sx={{ border: 1, borderColor: 'divider', mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={3} alignItems="center">
+            {/* Search Bar */}
+            <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              variant="outlined"
-              placeholder="Search customers by name, email, company..."
+                size="small"
+                placeholder="Search customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch(e)}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
                     <SearchIcon />
                   </InputAdornment>
                 ),
-                endAdornment: (
+                  endAdornment: searchQuery && (
                   <InputAdornment position="end">
                     <IconButton 
-                      onClick={() => setFilterExpanded(!filterExpanded)}
-                      aria-label="toggle advanced filters"
+                        size="small" 
+                        onClick={() => {
+                          setSearchQuery('');
+                          setPage(0);
+                        }}
                     >
-                      <FilterIcon />
-                      {filterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        <ClearIcon fontSize="small" />
                     </IconButton>
                   </InputAdornment>
-                )
+                  ),
               }}
             />
-          </Box>
-          
+            </Grid>
+
+            {/* Time Period Filter */}
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={filters.time_period}
+                  onChange={handleFilterChange}
+                  name="time_period"
+                  displayEmpty
+                >
+                  <MenuItem value="all">All Time</MenuItem>
+                  <MenuItem value="today">Today</MenuItem>
+                  <MenuItem value="this_week">This Week</MenuItem>
+                  <MenuItem value="this_month">This Month</MenuItem>
+                  <MenuItem value="last_month">Last Month</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Advanced Filters Toggle */}
+            <Grid item xs={12} md={2}>
+              <Button
+                variant="outlined"
+                startIcon={<FilterIcon />}
+                endIcon={filterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                onClick={() => setFilterExpanded(!filterExpanded)}
+                sx={{ textTransform: 'none' }}
+              >
+                Filters
+              </Button>
+            </Grid>
+
+            {/* Clear Filters */}
+            <Grid item xs={12} md={2}>
+              <Button
+                variant="text"
+                startIcon={<ClearIcon />}
+                onClick={handleClearFilters}
+                sx={{ textTransform: 'none' }}
+              >
+                Clear All
+              </Button>
+            </Grid>
+
+            {/* Search Button */}
+            <Grid item xs={12} md={2}>
+              <Button
+                variant="contained"
+                onClick={handleSearch}
+                fullWidth
+                sx={{ textTransform: 'none' }}
+              >
+                Search
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Advanced Filters */}
           <Collapse in={filterExpanded}>
-            <Box sx={{ pt: 2, pb: 1 }}>
-              <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
-                Advanced Filters
-              </Typography>
-              <Grid container spacing={8}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <FormControl fullWidth variant="outlined">
+            <Divider sx={{ my: 2 }} />
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
                     <InputLabel>Region</InputLabel>
                     <Select
-                      name="region"
                       value={filters.region}
+                    label="Region"
                       onChange={handleFilterChange}
-                      label="Region"
+                    name="region"
                     >
-                      <MenuItem value="ANY">Any</MenuItem>
-                      <MenuItem value="NA">North America</MenuItem>
-                      <MenuItem value="EU">Europe</MenuItem>
-                      <MenuItem value="APAC">Asia Pacific</MenuItem>
-                      <MenuItem value="LATAM">Latin America</MenuItem>
-                      <MenuItem value="MENA">Middle East & North Africa</MenuItem>
-                      <MenuItem value="AF">Africa</MenuItem>
-                      <MenuItem value="OTHER">Other</MenuItem>
+                    <MenuItem value="">All Regions</MenuItem>
+                    <MenuItem value="north">North</MenuItem>
+                    <MenuItem value="south">South</MenuItem>
+                    <MenuItem value="east">East</MenuItem>
+                    <MenuItem value="west">West</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 
-                <Grid item xs={12} sm={6} md={4}>
-                  <FormControl fullWidth variant="outlined">
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
                     <InputLabel>Engagement Level</InputLabel>
                     <Select
-                      name="engagement_level"
                       value={filters.engagement_level}
+                    label="Engagement Level"
                       onChange={handleFilterChange}
-                      label="Engagement Level"
+                    name="engagement_level"
                     >
-                      <MenuItem value="ANY">Any</MenuItem>
-                      <MenuItem value="LOW">Low</MenuItem>
-                      <MenuItem value="MEDIUM">Medium</MenuItem>
-                      <MenuItem value="HIGH">High</MenuItem>
-                      <MenuItem value="VIP">VIP</MenuItem>
+                    <MenuItem value="">All Levels</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="low">Low</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 
-                <Grid item xs={12} sm={6} md={4}>
-                  <FormControl fullWidth variant="outlined">
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
                     <InputLabel>Status</InputLabel>
                     <Select
-                      name="status"
                       value={filters.status}
+                    label="Status"
                       onChange={handleFilterChange}
-                      label="Status"
+                    name="status"
                     >
-                      <MenuItem value="ANY">Any</MenuItem>
-                      <MenuItem value="ACTIVE">Active</MenuItem>
-                      <MenuItem value="INACTIVE">Inactive</MenuItem>
-                      <MenuItem value="LEAD">Lead</MenuItem>
-                      <MenuItem value="PROSPECT">Prospect</MenuItem>
+                    <MenuItem value="">All Status</MenuItem>
+                    <MenuItem value="lead">Lead</MenuItem>
+                    <MenuItem value="prospect">Prospect</MenuItem>
+                    <MenuItem value="customer">Customer</MenuItem>
                     </Select>
                   </FormControl>
-                </Grid>
               </Grid>
               
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                <Button 
-                  variant="outlined" 
-                  color="secondary"
-                  size="medium"
-                  onClick={() => {
-                    setFilters({
-                      region: '',
-                      engagement_level: '',
-                      status: '',
-                      is_active: true
-                    });
-                    setSearchQuery('');
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              </Box>
-            </Box>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Active Status</InputLabel>
+                  <Select
+                    value={filters.is_active}
+                    label="Active Status"
+                    onChange={handleFilterChange}
+                    name="is_active"
+                  >
+                    <MenuItem value="all">All</MenuItem>
+                    <MenuItem value="true">Active</MenuItem>
+                    <MenuItem value="false">Inactive</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
           </Collapse>
-        </Paper>
+        </CardContent>
+      </Card>
         
-        {/* Error message */}
-        {error && (
-          <Typography color="error" variant="body1" sx={{ my: 2 }}>
-            {error}
+      {/* Bulk Actions Toolbar */}
+      {selected.length > 0 && (
+        <Toolbar
+          sx={{
+            bgcolor: 'primary.light',
+            borderRadius: 1,
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <Typography variant="subtitle1" color="primary.dark">
+            {selected.length} customer{selected.length > 1 ? 's' : ''} selected
           </Typography>
-        )}
-        
-        {/* Customer list */}
-        {loading ? (
-          <Typography>Loading customers...</Typography>
-        ) : customers.length === 0 ? (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6">No customers found</Typography>
-            <Typography variant="body2">
-              Try adjusting your search filters or add a new customer.
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={handleBulkDelete}
+            sx={{ textTransform: 'none' }}
+          >
+            Delete Selected
+          </Button>
+        </Toolbar>
+      )}
+
+      {/* Customers Table */}
+      <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              Customer List
             </Typography>
-          </Paper>
-        ) : (
-          <>
-            <TableContainer component={Paper}>
-              <Table>
+          }
+          action={
+            <Typography variant="body2" color="text.secondary">
+              {totalCount} total customers
+            </Typography>
+          }
+        />
+        <Divider />
+
+        <TableContainer>
+          <Table stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Company</TableCell>
-                    <TableCell>Region</TableCell>
-                    <TableCell>Engagement</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                <TableCell padding="checkbox" sx={{ bgcolor: 'background.paper' }}>
+                  <Checkbox
+                    indeterminate={selected.length > 0 && selected.length < customers.length}
+                    checked={customers.length > 0 && selected.length === customers.length}
+                    onChange={handleSelectAll}
+                  />
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Customer</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Phone</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Status</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {customers.map((customer) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                      Loading customers...
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
+                    <Typography color="text.secondary">
+                      No customers found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
                     <TableRow 
                       key={customer.id} 
                       hover
-                      onClick={() => handleViewCustomer(customer)}
+                    selected={selected.includes(customer.id)}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selected.includes(customer.id)}
+                        onChange={() => handleSelectOne(customer.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar 
                       sx={{ 
-                        cursor: 'pointer',
-                        '&:hover': {
-                          backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                        }
-                      }}
-                    >
-                      <TableCell>
-                        <Box display="flex" alignItems="center">
-                          <PersonIcon sx={{ mr: 1 }} fontSize="small" />
-                          {customer.name}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" alignItems="center">
-                          <EmailIcon sx={{ mr: 1 }} fontSize="small" />
-                          {customer.email}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {customer.company && (
-                          <Box display="flex" alignItems="center">
-                            <BusinessIcon sx={{ mr: 1 }} fontSize="small" />
-                            {customer.company}
-                          </Box>
-                        )}
-                      </TableCell>
-                      <TableCell>{customer.region_display}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          size="small" 
-                          label={customer.engagement_level_display} 
-                          color={getEngagementLevelColor(customer.engagement_level)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          size="small" 
-                          label={customer.status_display} 
-                          color={getStatusColor(customer.status)}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          aria-label="customer actions"
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click event
-                            handleOpenActionMenu(e, customer);
+                            width: 40, 
+                            height: 40, 
+                            bgcolor: 'primary.main',
+                            fontSize: '1rem'
                           }}
                         >
-                          <MoreVertIcon />
+                          {customer.name?.charAt(0) || customer.first_name?.charAt(0) || 'U'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                            {customer.name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim()}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Customer ID #{customer.id}
+                          </Typography>
+                        </Box>
+                        </Box>
+                      </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.phone || '+1 555-123-4567'}</TableCell>
+                      <TableCell>
+                        <Chip 
+                        label={customer.is_active ? 'Active' : 'Deactive'} 
+                        color={customer.is_active ? 'success' : 'default'}
+                          size="small" 
+                        sx={{ fontWeight: 'medium' }}
+                        />
+                      </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={(event) => handleOpenActionMenu(event, customer)}
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                        <IconButton
+                          size="small"
+                        color="error"
+                        onClick={() => handleDeleteClick(customer)}
+                        >
+                        <DeleteIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))}
+                ))
+              )}
                 </TableBody>
               </Table>
+        </TableContainer>
+
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Typography variant="body2" color="text.secondary">
+            Items per page:
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <FormControl size="small">
+              <Select
+                value={rowsPerPage}
+                onChange={handleChangeRowsPerPage}
+              >
+                <MenuItem value={5}>5</MenuItem>
+                <MenuItem value={10}>10</MenuItem>
+                <MenuItem value={15}>15</MenuItem>
+                <MenuItem value={20}>20</MenuItem>
+              </Select>
+            </FormControl>
+            <Typography variant="body2" color="text.secondary">
+              {page * rowsPerPage + 1} – {Math.min((page + 1) * rowsPerPage, totalCount)} of {totalCount}
+            </Typography>
               <TablePagination
-                rowsPerPageOptions={[5, 10, 25]}
                 component="div"
-                count={-1} // We don't know the total count, so use -1 to indicate infinite
-                rowsPerPage={rowsPerPage}
+              count={totalCount}
                 page={page}
                 onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
                 onRowsPerPageChange={handleChangeRowsPerPage}
-              />
-            </TableContainer>
-          </>
-        )}
+              showFirstButton
+              showLastButton
+              labelDisplayedRows={() => ''}
+              labelRowsPerPage=""
+              sx={{ '.MuiTablePagination-toolbar': { minHeight: 'auto' } }}
+            />
+          </Box>
+        </Box>
+      </Card>
         
         {/* Action Menu */}
         <Menu
@@ -459,45 +662,65 @@ const Customers = () => {
           open={Boolean(actionMenu)}
           onClose={handleCloseActionMenu}
         >
-          <MenuItem onClick={() => selectedCustomer && handleViewCustomer(selectedCustomer)}>
+        <MenuItem onClick={() => handleViewCustomer(selectedCustomer)}>
+          <VisibilityIcon sx={{ mr: 1 }} fontSize="small" />
             View Details
           </MenuItem>
-          <MenuItem onClick={() => selectedCustomer && handleEditCustomer(selectedCustomer)}>
+        <MenuItem onClick={() => handleEditCustomer(selectedCustomer)}>
+          <EditIcon sx={{ mr: 1 }} fontSize="small" />
             Edit Customer
           </MenuItem>
           <Divider />
-          <MenuItem 
-            onClick={() => selectedCustomer && handleDeleteClick(selectedCustomer)}
-            sx={{ color: 'error.main' }}
-          >
+        <MenuItem onClick={() => handleDeleteClick(selectedCustomer)} sx={{ color: 'error.main' }}>
+          <DeleteIcon sx={{ mr: 1 }} fontSize="small" />
             Delete Customer
           </MenuItem>
         </Menu>
         
         {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={confirmDeleteOpen}
-          onClose={handleCancelDelete}
-        >
-          <DialogTitle>Confirm Deletion</DialogTitle>
+      <Dialog open={confirmDeleteOpen} onClose={handleCancelDelete}>
+        <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Are you sure you want to delete customer "{customerToDelete?.name}"? 
-              This action cannot be undone.
+            Are you sure you want to delete the customer "{customerToDelete?.name || customerToDelete?.first_name}"? This action cannot be undone.
             </DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCancelDelete} color="primary">
+          <Button onClick={handleCancelDelete} sx={{ textTransform: 'none' }}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmDelete} color="error">
+          <Button onClick={handleConfirmDelete} color="error" variant="contained" sx={{ textTransform: 'none' }}>
               Delete
             </Button>
           </DialogActions>
         </Dialog>
-      </Box>
-    </Container>
-  );
-};
 
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)}>
+        <DialogTitle>Confirm Bulk Delete</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete {selected.length} selected customer{selected.length > 1 ? 's' : ''}? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkDeleteOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmBulkDelete} color="error" variant="contained" sx={{ textTransform: 'none' }}>
+            Delete Selected
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Snackbar */}
+      {error && (
+        <Typography color="error" sx={{ mt: 2 }}>
+          {error}
+        </Typography>
+      )}
+      </Box>
+  );
+  };
+  
 export default Customers; 

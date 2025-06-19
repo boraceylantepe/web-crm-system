@@ -18,7 +18,7 @@ import taskService from '../../services/taskService';
 
 const TaskItem = ({ task, onEdit, onDelete, onStatusChange, onClick, style }) => {
     const { user } = useContext(AuthContext);
-    const isManager = user?.is_staff || user?.role === 'ADMIN';
+    const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
     const isAssignedToMe = user?.id === task.assigned_to;
     
     const [anchorEl, setAnchorEl] = useState(null);

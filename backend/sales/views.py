@@ -15,12 +15,27 @@ logger = logging.getLogger(__name__)
 
 class SaleViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for sales management.
+    API endpoint for sales management with role-based filtering.
     """
-    queryset = Sale.objects.all().order_by('-created_at')
     serializer_class = SaleSerializer
     filterset_fields = ['status', 'priority', 'is_archived', 'assigned_to']
     search_fields = ['title', 'description', 'customer__name']
+    
+    def get_queryset(self):
+        """
+        Filter sales based on user role:
+        - ADMIN/MANAGER: Can see all sales
+        - USER: Can only see sales assigned to them
+        """
+        user = self.request.user
+        queryset = Sale.objects.all().order_by('-created_at')
+        
+        # Apply role-based filtering
+        if user.role == 'USER':
+            queryset = queryset.filter(assigned_to=user)
+        # ADMIN and MANAGER can see all sales
+        
+        return queryset
     
     def get_permissions(self):
         """
@@ -128,11 +143,15 @@ def delete_sale(request, pk):
 @permission_classes([IsAuthenticated])
 def sales_pipeline(request):
     """
-    Endpoint to get sales pipeline data grouped by status
+    Endpoint to get sales pipeline data grouped by status with role-based filtering
     """
     try:
         # Get all non-archived sales with related data
         sales = Sale.objects.filter(is_archived=False).select_related('customer', 'assigned_to')
+        
+        # Apply role-based filtering
+        if request.user.role == 'USER':
+            sales = sales.filter(assigned_to=request.user)
         
         # Apply search filter if provided
         search_term = request.query_params.get('search', None)
@@ -195,11 +214,15 @@ def sales_pipeline(request):
 @permission_classes([IsAuthenticated])
 def sales_stats(request):
     """
-    Endpoint to get sales statistics
+    Endpoint to get sales statistics with role-based filtering
     """
     try:
-        # Simple stats
+        # Simple stats with role-based filtering
         all_sales = Sale.objects.all()
+        
+        # Apply role-based filtering
+        if request.user.role == 'USER':
+            all_sales = all_sales.filter(assigned_to=request.user)
         result = {
             'total_count': all_sales.count(),
             'total_value': float(all_sales.aggregate(Sum('amount'))['amount__sum'] or 0),

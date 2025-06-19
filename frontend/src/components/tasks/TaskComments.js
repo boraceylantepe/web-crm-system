@@ -19,7 +19,8 @@ import {
     Delete as DeleteIcon,
     Edit as EditIcon,
     Cancel as CancelIcon,
-    Save as SaveIcon
+    Save as SaveIcon,
+    Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { AuthContext } from '../../context/AuthContext';
 import taskService from '../../services/taskService';
@@ -42,23 +43,54 @@ const TaskComments = ({ taskId }) => {
 
     // Fetch comments when the component mounts or taskId changes
     useEffect(() => {
+        console.log(`TaskComments useEffect triggered with taskId: ${taskId}`);
         if (taskId) {
+            // Always clear state and fetch fresh
+            setComments([]);
+            setError(null);
+            setEditingCommentId(null);
+            setEditedCommentText('');
+            setNewComment('');
             fetchComments();
         }
     }, [taskId]);
 
-    const fetchComments = async () => {
+    const fetchComments = async (forceRefresh = false) => {
+        if (!taskId) {
+            console.log('No taskId provided, skipping comment fetch');
+            return;
+        }
+        
+        console.log(`Fetching comments for task ${taskId} (forceRefresh: ${forceRefresh})`);
         setLoading(true);
         setError(null);
+        
         try {
             const response = await taskService.getTaskComments(taskId);
+            console.log('Raw API response:', response);
+            
             // Ensure comments is always an array
             const fetchedComments = Array.isArray(response) ? response : [];
-            console.log("Fetched comments:", response); // Debug the response
+            console.log(`Setting ${fetchedComments.length} comments for task ${taskId}:`, fetchedComments);
             setComments(fetchedComments);
+            
+            if (fetchedComments.length === 0) {
+                console.log('No comments found for this task');
+            }
         } catch (err) {
             console.error('Error fetching comments:', err);
-            setError('Failed to load comments. Please try again later.');
+            console.error('Error status:', err.response?.status);
+            console.error('Error data:', err.response?.data);
+            
+            // Set more specific error messages
+            let errorMessage = 'Failed to load comments.';
+            if (err.response?.status === 403) {
+                errorMessage = 'You do not have permission to view comments on this task.';
+            } else if (err.response?.status === 404) {
+                errorMessage = 'Task not found.';
+            }
+            
+            setError(errorMessage);
             setComments([]); // Set empty array on error
         } finally {
             setLoading(false);
@@ -75,16 +107,10 @@ const TaskComments = ({ taskId }) => {
             console.log(`Submitting comment for task ${taskId}: "${newComment}"`);
             const response = await taskService.addTaskComment(taskId, newComment);
             
-            // Ensure we have a valid comment object
-            if (response && typeof response === 'object') {
-                console.log('Comment added successfully:', response);
-                setComments(prevComments => [...prevComments, response]);
-                setNewComment('');
-            } else {
-                console.error('Invalid comment response:', response);
-                // Refresh comments after adding to ensure we have the latest data
-                fetchComments();
-            }
+            // Always refresh comments after adding to ensure we have the latest data
+            console.log('Comment added successfully, refreshing comments list');
+            await fetchComments(true);
+            setNewComment('');
         } catch (err) {
             console.error('Error adding comment:', err);
             console.error('Response data:', err.response?.data);
@@ -176,9 +202,20 @@ const TaskComments = ({ taskId }) => {
 
     return (
         <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>
-                Comments
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6">
+                    Comments
+                </Typography>
+                <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<RefreshIcon />}
+                    onClick={() => fetchComments(true)}
+                    disabled={loading}
+                >
+                    Refresh
+                </Button>
+            </Box>
             <Divider sx={{ mb: 2 }} />
 
             {loading && commentsArray.length === 0 ? (
@@ -200,7 +237,7 @@ const TaskComments = ({ taskId }) => {
                             <ListItem
                                 alignItems="flex-start"
                                 secondaryAction={
-                                    (user?.id === comment.user || user?.is_staff) && (
+                                    (user?.id === comment.user || user?.role === 'ADMIN') && (
                                         <Box>
                                             {editingCommentId === comment.id ? (
                                                 <>

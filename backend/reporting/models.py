@@ -1,8 +1,20 @@
 from django.db import models
 from django.conf import settings
-from customers.models import TimeStampedModel
+from django.utils import timezone
 import json
 
+# PostgreSQL JSONField import
+from django.db.models import JSONField
+
+class TimeStampedModel(models.Model):
+    """
+    Abstract base class that provides self-updating 'created_at' and 'updated_at' fields.
+    """
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
 
 class ReportTemplate(TimeStampedModel):
     """
@@ -22,11 +34,11 @@ class ReportTemplate(TimeStampedModel):
     report_type = models.CharField(max_length=50, choices=REPORT_TYPES)
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='report_templates')
     
-    # Store report configuration as JSON (TextField for SQLite compatibility)
-    filters = models.TextField(default='{}', help_text="Filters applied to the report (JSON)")
-    metrics = models.TextField(default='[]', help_text="List of metrics to include (JSON)")
-    date_range = models.TextField(default='{}', help_text="Date range configuration (JSON)")
-    grouping = models.TextField(default='{}', help_text="How to group the data (JSON)")
+    # Store report configuration using PostgreSQL JSONField
+    filters = JSONField(default=dict, help_text="Filters applied to the report")
+    metrics = JSONField(default=list, help_text="List of metrics to include")
+    date_range = JSONField(default=dict, help_text="Date range configuration")
+    grouping = JSONField(default=dict, help_text="How to group the data")
     
     is_public = models.BooleanField(default=False, help_text="Available to all users")
     is_active = models.BooleanField(default=True)
@@ -37,49 +49,38 @@ class ReportTemplate(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    # Legacy property methods for backward compatibility
     @property
     def filters_dict(self):
-        try:
-            return json.loads(self.filters)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.filters
 
     @filters_dict.setter
     def filters_dict(self, value):
-        self.filters = json.dumps(value)
+        self.filters = value
 
     @property
     def metrics_list(self):
-        try:
-            return json.loads(self.metrics)
-        except (json.JSONDecodeError, TypeError):
-            return []
+        return self.metrics
 
     @metrics_list.setter
     def metrics_list(self, value):
-        self.metrics = json.dumps(value)
+        self.metrics = value
 
     @property
     def date_range_dict(self):
-        try:
-            return json.loads(self.date_range)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.date_range
 
     @date_range_dict.setter
     def date_range_dict(self, value):
-        self.date_range = json.dumps(value)
+        self.date_range = value
 
     @property
     def grouping_dict(self):
-        try:
-            return json.loads(self.grouping)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.grouping
 
     @grouping_dict.setter
     def grouping_dict(self, value):
-        self.grouping = json.dumps(value)
+        self.grouping = value
 
 
 class GeneratedReport(TimeStampedModel):
@@ -102,9 +103,9 @@ class GeneratedReport(TimeStampedModel):
     execution_time = models.DurationField(null=True, blank=True)
     error_message = models.TextField(blank=True, null=True)
     
-    # Generated data (TextField for SQLite compatibility)
-    data = models.TextField(default='{}', help_text="Generated report data (JSON)")
-    summary_stats = models.TextField(default='{}', help_text="Summary statistics (JSON)")
+    # Generated data using PostgreSQL JSONField
+    data = JSONField(default=dict, help_text="Generated report data")
+    summary_stats = JSONField(default=dict, help_text="Summary statistics")
     
     # File paths for exports
     csv_file_path = models.CharField(max_length=500, blank=True, null=True)
@@ -116,27 +117,22 @@ class GeneratedReport(TimeStampedModel):
     def __str__(self):
         return f"{self.template.name} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
+    # Legacy property methods for backward compatibility
     @property
     def data_dict(self):
-        try:
-            return json.loads(self.data)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.data
 
     @data_dict.setter
     def data_dict(self, value):
-        self.data = json.dumps(value)
+        self.data = value
 
     @property
     def summary_stats_dict(self):
-        try:
-            return json.loads(self.summary_stats)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.summary_stats
 
     @summary_stats_dict.setter
     def summary_stats_dict(self, value):
-        self.summary_stats = json.dumps(value)
+        self.summary_stats = value
 
 
 class ReportSchedule(TimeStampedModel):
@@ -161,8 +157,8 @@ class ReportSchedule(TimeStampedModel):
     day_of_week = models.IntegerField(null=True, blank=True, help_text="Day of week for weekly reports (0=Monday)")
     day_of_month = models.IntegerField(null=True, blank=True, help_text="Day of month for monthly reports")
     
-    # Recipients (TextField for SQLite compatibility)
-    recipients = models.TextField(default='[]', help_text="List of email addresses to send reports to (JSON)")
+    # Recipients using PostgreSQL JSONField
+    recipients = JSONField(default=list, help_text="List of email addresses to send reports to")
     
     # Status
     is_active = models.BooleanField(default=True)
@@ -175,16 +171,14 @@ class ReportSchedule(TimeStampedModel):
     def __str__(self):
         return f"{self.name} ({self.frequency})"
 
+    # Legacy property methods for backward compatibility
     @property
     def recipients_list(self):
-        try:
-            return json.loads(self.recipients)
-        except (json.JSONDecodeError, TypeError):
-            return []
+        return self.recipients
 
     @recipients_list.setter
     def recipients_list(self, value):
-        self.recipients = json.dumps(value)
+        self.recipients = value
 
 
 class DashboardWidget(TimeStampedModel):
@@ -212,12 +206,12 @@ class DashboardWidget(TimeStampedModel):
     widget_type = models.CharField(max_length=50, choices=WIDGET_TYPES)
     size = models.CharField(max_length=20, choices=SIZE_CHOICES, default='medium')
     
-    # Widget configuration (TextField for SQLite compatibility)
+    # Widget configuration using PostgreSQL JSONField
     data_source = models.CharField(max_length=100, help_text="API endpoint or data source")
-    filters = models.TextField(default='{}', help_text="Widget filters (JSON)")
-    display_options = models.TextField(default='{}', help_text="Chart colors, labels, etc. (JSON)")
+    filters = JSONField(default=dict, help_text="Widget filters")
+    display_options = JSONField(default=dict, help_text="Chart colors, labels, etc.")
     
-    # Position on dashboard
+    # Position on grid
     position_x = models.IntegerField(default=0)
     position_y = models.IntegerField(default=0)
     
@@ -230,27 +224,22 @@ class DashboardWidget(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    # Legacy property methods for backward compatibility
     @property
     def filters_dict(self):
-        try:
-            return json.loads(self.filters)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.filters
 
     @filters_dict.setter
     def filters_dict(self, value):
-        self.filters = json.dumps(value)
+        self.filters = value
 
     @property
     def display_options_dict(self):
-        try:
-            return json.loads(self.display_options)
-        except (json.JSONDecodeError, TypeError):
-            return {}
+        return self.display_options
 
     @display_options_dict.setter
     def display_options_dict(self, value):
-        self.display_options = json.dumps(value)
+        self.display_options = value
 
 
 class UserDashboard(TimeStampedModel):
@@ -293,7 +282,7 @@ class ReportShare(TimeStampedModel):
     
     # Share with specific users or email addresses
     shared_with_users = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='received_reports')
-    external_emails = models.TextField(default='[]', help_text="External email addresses (JSON)")
+    external_emails = JSONField(default=list, help_text="External email addresses")
     
     # Share settings
     can_download = models.BooleanField(default=True)
@@ -307,13 +296,11 @@ class ReportShare(TimeStampedModel):
     def __str__(self):
         return f"Share: {self.report.template.name}"
 
+    # Legacy property methods for backward compatibility
     @property
     def external_emails_list(self):
-        try:
-            return json.loads(self.external_emails)
-        except (json.JSONDecodeError, TypeError):
-            return []
+        return self.external_emails
 
     @external_emails_list.setter
     def external_emails_list(self, value):
-        self.external_emails = json.dumps(value)
+        self.external_emails = value

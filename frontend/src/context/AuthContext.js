@@ -195,6 +195,37 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update user information in context
+  const updateUser = (updatedUserData) => {
+    console.log('Updating user in context:', updatedUserData);
+    setUser(prevUser => {
+      const newUser = {
+        ...prevUser,
+        ...updatedUserData
+      };
+      console.log('New user state:', newUser);
+      return newUser;
+    });
+    
+    // Also update localStorage if needed
+    if (updatedUserData.id) {
+      localStorage.setItem('user_id', updatedUserData.id.toString());
+    }
+  };
+
+  // Refresh user info from server
+  const refreshUserInfo = async () => {
+    try {
+      console.log('Refreshing user info from server...');
+      const updatedUser = await getUserInfo();
+      console.log('Refreshed user data:', updatedUser);
+      return updatedUser;
+    } catch (error) {
+      console.error('Error refreshing user info:', error);
+      throw error;
+    }
+  };
+
   // Role-based utility functions
   const isAdmin = user?.role === 'ADMIN';
   
@@ -226,6 +257,8 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token,
         passwordChangeRequired,
         changePassword,
+        updateUser,
+        refreshUserInfo,
         sessionTimeout,
         // Role-based properties
         isAdmin,

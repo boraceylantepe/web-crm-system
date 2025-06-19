@@ -42,27 +42,7 @@ const Login = () => {
     }
   };
 
-  // For testing purposes - adds a demo token to localStorage
-  const handleDemoLogin = () => {
-    // This is a demo token - not for production use
-    // Use a longer-lived token with proper structure
-    const demoToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkRlbW8gVXNlciIsImVtYWlsIjoiZGVtb0BleGFtcGxlLmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNjE2MjM5MDIyLCJleHAiOjE5NDM3NjgwMDR9.24jYUy7VxVqEh0xN0L4JL9DTI-ZJtUJLhyJJinA3QZQ";
-    
-    localStorage.setItem('access_token', demoToken);
-    localStorage.setItem('refresh_token', demoToken);
-    
-    // Set a userInfo object to provide context for the dashboard
-    const userInfo = {
-      id: 1,
-      first_name: "Demo",
-      last_name: "User",
-      email: "demo@example.com"
-    };
-    localStorage.setItem('user_info', JSON.stringify(userInfo));
-    
-    // Force page reload to reinitialize auth context
-    window.location.href = '/';
-  };
+
 
   return (
     <Container component="main" maxWidth="xs">
@@ -118,11 +98,6 @@ const Login = () => {
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
-            <Box sx={{ textAlign: 'center' }}>
-              <Link component="button" variant="body2" onClick={handleDemoLogin}>
-                Use Demo Login (For Testing)
-              </Link>
-            </Box>
           </Box>
         </Paper>
       </Box>

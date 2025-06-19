@@ -408,59 +408,63 @@ class AnalyticsService:
     @staticmethod
     def get_dashboard_kpis(user=None):
         """
-        Get key performance indicators for dashboard widgets.
+        Get key performance indicators for dashboard widgets with role-based filtering.
         """
-        # Current month data
-        current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        previous_month = (current_month - timedelta(days=1)).replace(day=1)
-
         kpis = {}
 
-        # Sales KPIs
-        current_sales = Sale.objects.filter(created_at__gte=current_month)
-        previous_sales = Sale.objects.filter(created_at__gte=previous_month, created_at__lt=current_month)
-        
+        # Sales KPIs - All time data with role-based filtering
+        all_sales = Sale.objects.all()
         if user:
-            current_sales = current_sales.filter(assigned_to=user)
-            previous_sales = previous_sales.filter(assigned_to=user)
+            # Apply role-based filtering for USER role
+            if user.role == 'USER':
+                all_sales = all_sales.filter(assigned_to=user)
+            # ADMIN and MANAGER can see all sales
 
         kpis['sales'] = {
-            'current_month_count': current_sales.count(),
-            'previous_month_count': previous_sales.count(),
-            'current_month_amount': current_sales.aggregate(Sum('amount'))['amount__sum'] or 0,
-            'previous_month_amount': previous_sales.aggregate(Sum('amount'))['amount__sum'] or 0,
-            'won_this_month': current_sales.filter(status='WON').count(),
+            'total_count': all_sales.count(),
+            'total_amount': all_sales.aggregate(Sum('amount'))['amount__sum'] or 0,
+            'won_count': all_sales.filter(status='WON').count(),
+            'won_amount': all_sales.filter(status='WON').aggregate(Sum('amount'))['amount__sum'] or 0,
+            'pipeline_value': all_sales.exclude(status__in=['WON', 'LOST']).aggregate(Sum('amount'))['amount__sum'] or 0,
         }
 
-        # Task KPIs
-        current_tasks = Task.objects.filter(created_at__gte=current_month)
+        # Task KPIs - All time data with role-based filtering
+        all_tasks = Task.objects.all()
         if user:
-            current_tasks = current_tasks.filter(assigned_to=user)
+            # Apply role-based filtering for USER role
+            if user.role == 'USER':
+                all_tasks = all_tasks.filter(assigned_to=user)
+            # ADMIN and MANAGER can see all tasks
+
+        total_tasks = all_tasks.count()
+        completed_tasks = all_tasks.filter(status='C').count()
 
         kpis['tasks'] = {
-            'pending_tasks': current_tasks.filter(status='P').count(),
-            'completed_tasks': current_tasks.filter(status='C').count(),
-            'overdue_tasks': current_tasks.filter(status='O').count(),
-            'completion_rate': 0,
+            'total_tasks': total_tasks,
+            'pending_tasks': all_tasks.filter(status='P').count(),
+            'completed_tasks': completed_tasks,
+            'overdue_tasks': all_tasks.filter(status='O').count(),
+            'completion_rate': (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0,
         }
 
-        total_tasks = current_tasks.count()
-        if total_tasks > 0:
-            kpis['tasks']['completion_rate'] = (kpis['tasks']['completed_tasks'] / total_tasks) * 100
-
-        # Customer KPIs
-        current_customers = Customer.objects.filter(created_at__gte=current_month)
+        # Customer KPIs - All time data with role-based filtering
+        all_customers = Customer.objects.all()
         if user:
-            current_customers = current_customers.filter(owner=user)
+            # Apply role-based filtering for USER role
+            if user.role == 'USER':
+                filtered_customers = all_customers.filter(owner=user)
+            else:
+                # ADMIN and MANAGER can see all customers
+                filtered_customers = all_customers
+        else:
+            filtered_customers = all_customers
 
         kpis['customers'] = {
-            'new_customers': current_customers.count(),
-            'active_customers': Customer.objects.filter(status='ACTIVE').count(),
-            'vip_customers': Customer.objects.filter(engagement_level='VIP').count(),
+            'total_customers': filtered_customers.count(),
+            'active_customers': filtered_customers.filter(status='ACTIVE').count(),
+            'prospects': filtered_customers.filter(status='PROSPECT').count(),
+            'leads': filtered_customers.filter(status='LEAD').count(),
+            'vip_customers': filtered_customers.filter(engagement_level='VIP').count(),
         }
-
-        if user:
-            kpis['customers']['active_customers'] = Customer.objects.filter(status='ACTIVE', owner=user).count()
-            kpis['customers']['vip_customers'] = Customer.objects.filter(engagement_level='VIP', owner=user).count()
 
         return convert_decimals_to_float(kpis) 

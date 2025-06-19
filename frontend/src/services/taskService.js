@@ -68,12 +68,41 @@ export const getUsersForTaskAssignment = async () => {
 // Task comments
 export const getTaskComments = async (taskId) => {
   try {
-    const response = await axios.get(`${API_URL}/api/task-management/tasks/${taskId}/comments/`, getAuthHeaders());
-    // Ensure we return an array even if the API returns something else
-    return Array.isArray(response.data) ? response.data : [];
+    console.log(`taskService.getTaskComments called for taskId: ${taskId}`);
+    const headers = getAuthHeaders();
+    console.log('Request headers:', headers);
+    
+    const response = await axios.get(`${API_URL}/api/task-management/tasks/${taskId}/comments/`, {
+      ...headers,
+      // Add cache-busting parameter to ensure fresh data
+      params: { _t: Date.now() }
+    });
+    
+    console.log('API response status:', response.status);
+    console.log('API response data:', response.data);
+    
+    // Handle paginated response - extract comments from results array
+    let comments = [];
+    if (response.data && response.data.results && Array.isArray(response.data.results)) {
+      // Paginated response format
+      comments = response.data.results;
+      console.log(`Found paginated response with ${comments.length} comments`);
+    } else if (Array.isArray(response.data)) {
+      // Direct array response format
+      comments = response.data;
+      console.log(`Found direct array response with ${comments.length} comments`);
+    } else {
+      console.log('Unexpected response format, defaulting to empty array');
+      comments = [];
+    }
+    
+    console.log(`taskService returning ${comments.length} comments:`, comments);
+    return comments;
   } catch (error) {
     console.error('Error fetching task comments:', error);
-    return []; // Return empty array on error
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    throw error; // Re-throw to let component handle it
   }
 };
 

@@ -127,7 +127,58 @@ export const changePassword = async (passwordData) => {
   }
 };
 
-export default {
+// Get current user profile
+export const getProfile = async () => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/api/users/profile/`,
+      getAuthHeaders()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    throw error;
+  }
+};
+
+// Update current user profile (supports file uploads)
+export const updateProfile = async (formData) => {
+  try {
+    const token = localStorage.getItem('access_token');
+    
+    const response = await axios.patch(
+      `${API_URL}/api/users/profile/`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type - let axios set it automatically for FormData
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    throw error;
+  }
+};
+
+// Update current user profile with JSON data (for non-file updates)
+export const updateProfileData = async (userData) => {
+  try {
+    const response = await axios.patch(
+      `${API_URL}/api/users/profile/`,
+      userData,
+      getAuthHeaders()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error updating profile data:', error);
+    throw error;
+  }
+};
+
+const userService = {
   getUsers,
   getUserById,
   getCurrentUser,
@@ -135,5 +186,10 @@ export default {
   updateUser,
   managerUpdateUser,
   deleteUser,
-  changePassword
-}; 
+  changePassword,
+  getProfile,
+  updateProfile,
+  updateProfileData
+};
+
+export default userService; 

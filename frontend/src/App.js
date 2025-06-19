@@ -27,6 +27,7 @@ import SaleAdd from './pages/SaleAdd';
 import Users from './pages/Users';
 import UserAdd from './pages/UserAdd';
 import UserEdit from './pages/UserEdit';
+import Profile from './pages/Profile';
 
 // Task Management
 import TasksPage from './pages/TasksPage';
@@ -80,6 +81,9 @@ function App() {
                 }
               >
                 <Route index element={<Dashboard />} />
+                
+                {/* Profile Route - accessible to all authenticated users */}
+                <Route path="profile" element={<Profile />} />
                 
                 {/* Customer Routes */}
                 <Route path="customers" element={<Customers />} />

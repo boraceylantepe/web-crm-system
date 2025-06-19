@@ -18,7 +18,13 @@ import {
   Collapse,
   IconButton,
   Divider,
-  Chip
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -32,15 +38,79 @@ import {
 import { 
   LineChart, 
   BarChart, 
-  PieChart, 
-  DoughnutChart, 
+  DonutChart, 
   MetricCard, 
-  ProgressBarChart,
-  DataTable,
-  chartUtils 
+  ProgressChart,
+  AreaChart
 } from '../components/charts/ChartComponents';
 import { AuthContext } from '../context/AuthContext';
 import reportingService from '../services/reportingService';
+
+// Utility functions for chart data formatting (recreated from removed chartUtils)
+const chartUtils = {
+  formatCurrency: (value, currency = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+    }).format(value);
+  },
+  
+  formatLargeNumber: (value) => {
+    if (value >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    }
+    if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value.toString();
+  },
+  
+  calculateChange: (current, previous) => {
+    if (!previous || previous === 0) return 0;
+    return ((current - previous) / previous * 100).toFixed(1);
+  }
+};
+
+// Simple DataTable component to replace the missing one
+const DataTable = ({ data, columns, height = 300 }) => {
+  if (!data || data.length === 0) {
+    return (
+      <Box sx={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography color="text.secondary">No data available</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <TableContainer sx={{ maxHeight: height }}>
+      <Table stickyHeader size="small">
+        <TableHead>
+          <TableRow>
+            {columns.map((column, index) => (
+              <TableCell key={index} sx={{ fontWeight: 'bold' }}>
+                {column.title}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {data.map((row, rowIndex) => (
+            <TableRow key={rowIndex} hover>
+              {columns.map((column, colIndex) => (
+                <TableCell key={colIndex}>
+                  {column.render 
+                    ? column.render(row[column.key], row)
+                    : row[column.key] || '-'
+                  }
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
 
 const Analytics = () => {
   const { user, isAdminOrManager } = useContext(AuthContext);
@@ -207,128 +277,54 @@ const Analytics = () => {
   };
 
   const generateCSVContent = (data) => {
-    let csv = 'Analytics Export Report\n';
-    csv += `Generated on: ${new Date().toLocaleString()}\n`;
-    csv += `Exported by: ${data.exported_by}\n`;
-    csv += `Date Range: ${data.filters.date_range.startDate || 'All'} to ${data.filters.date_range.endDate || 'All'}\n`;
-    csv += `Grouping: ${data.filters.grouping}\n\n`;
+    const sections = [];
+    
+    // Helper function to convert object to CSV rows
+    const objectToCSV = (obj, title) => {
+      const rows = [`"${title}"`];
+      Object.entries(obj).forEach(([key, value]) => {
+        if (typeof value === 'object' && value !== null) {
+          rows.push(`"${key}","${JSON.stringify(value)}"`);
+        } else {
+          rows.push(`"${key}","${value}"`);
+        }
+      });
+      return rows.join('\n');
+    };
 
-    // Dashboard KPIs Section
+    // Add dashboard KPIs
     if (data.dashboard_kpis) {
-      csv += 'DASHBOARD KPIS\n';
-      csv += 'Metric,Current Value,Previous Value\n';
-      
-      if (data.dashboard_kpis.sales) {
-        csv += `Sales This Month,${data.dashboard_kpis.sales.current_month_amount || 0},${data.dashboard_kpis.sales.previous_month_amount || 0}\n`;
-        csv += `Sales Count,${data.dashboard_kpis.sales.current_month_count || 0},${data.dashboard_kpis.sales.previous_month_count || 0}\n`;
-      }
-      
-      if (data.dashboard_kpis.customers) {
-        csv += `Active Customers,${data.dashboard_kpis.customers.active_customers || 0},\n`;
-        csv += `New Customers,${data.dashboard_kpis.customers.new_customers || 0},\n`;
-      }
-      
-      if (data.dashboard_kpis.tasks) {
-        csv += `Task Completion Rate,${data.dashboard_kpis.tasks.completion_rate || 0}%,\n`;
-        csv += `Completed Tasks,${data.dashboard_kpis.tasks.completed_tasks || 0},\n`;
-        csv += `Pending Tasks,${data.dashboard_kpis.tasks.pending_tasks || 0},\n`;
-      }
-      
-      csv += '\n';
+      sections.push(objectToCSV(data.dashboard_kpis, 'Dashboard KPIs'));
     }
 
-    // Sales Performance Section
+    // Add sales performance
     if (data.sales_performance) {
-      csv += 'SALES PERFORMANCE\n';
-      
-      if (data.sales_performance.summary) {
-        csv += 'Summary\n';
-        csv += 'Metric,Value\n';
-        csv += `Total Sales,${data.sales_performance.summary.total_sales || 0}\n`;
-        csv += `Total Amount,${data.sales_performance.summary.total_amount || 0}\n`;
-        csv += `Won Sales,${data.sales_performance.summary.won_sales || 0}\n`;
-        csv += `Win Rate,${data.sales_performance.summary.win_rate || 0}%\n`;
-        csv += '\n';
-      }
-
-      if (data.sales_performance.sales_by_status) {
-        csv += 'Sales by Status\n';
-        csv += 'Status,Count,Amount\n';
-        data.sales_performance.sales_by_status.forEach(item => {
-          csv += `${item.status},${item.count},${item.total_amount || 0}\n`;
-        });
-        csv += '\n';
-      }
+      sections.push(objectToCSV(data.sales_performance, 'Sales Performance'));
     }
 
-    // Task Performance Section
+    // Add customer engagement
+    if (data.customer_engagement) {
+      sections.push(objectToCSV(data.customer_engagement, 'Customer Engagement'));
+    }
+
+    // Add task completion
     if (data.task_completion) {
-      csv += 'TASK COMPLETION\n';
-      
-      if (data.task_completion.summary) {
-        csv += 'Summary\n';
-        csv += 'Metric,Value\n';
-        csv += `Total Tasks,${data.task_completion.summary.total_tasks || 0}\n`;
-        csv += `Completed Tasks,${data.task_completion.summary.completed_tasks || 0}\n`;
-        csv += `Completion Rate,${data.task_completion.summary.completion_rate || 0}%\n`;
-        csv += '\n';
-      }
-
-      if (data.task_completion.tasks_by_status) {
-        csv += 'Tasks by Status\n';
-        csv += 'Status,Count\n';
-        data.task_completion.tasks_by_status.forEach(item => {
-          csv += `${item.status},${item.count}\n`;
-        });
-        csv += '\n';
-      }
+      sections.push(objectToCSV(data.task_completion, 'Task Completion'));
     }
 
-    // Performance Data Section (for admins/managers)
-    if (data.sales_performance?.top_performers && isAdminOrManager) {
-      csv += 'TOP SALES PERFORMERS\n';
-      csv += 'Name,Total Sales,Total Amount,Won Sales\n';
-      data.sales_performance.top_performers.forEach(performer => {
-        const name = `${performer.assigned_to__first_name || ''} ${performer.assigned_to__last_name || ''}`.trim() || performer.assigned_to__username;
-        csv += `${name},${performer.total_sales || 0},${performer.total_amount || 0},${performer.won_sales || 0}\n`;
-      });
-      csv += '\n';
-    }
-
-    if (data.task_completion?.user_performance && isAdminOrManager) {
-      csv += 'TASK PERFORMANCE BY USER\n';
-      csv += 'Name,Total Tasks,Completed Tasks,Completion Rate\n';
-      data.task_completion.user_performance.forEach(user => {
-        const name = `${user.assigned_to__first_name || ''} ${user.assigned_to__last_name || ''}`.trim() || user.assigned_to__username;
-        csv += `${name},${user.total_tasks || 0},${user.completed_tasks || 0},${user.completion_rate || 0}%\n`;
-      });
-      csv += '\n';
-    }
-
-    // Conversion Metrics
+    // Add conversion ratios
     if (data.conversion_ratios) {
-      csv += 'CONVERSION METRICS\n';
-      
-      if (data.conversion_ratios.sales_conversion) {
-        csv += 'Sales Conversion\n';
-        csv += 'Metric,Value\n';
-        csv += `Total Opportunities,${data.conversion_ratios.sales_conversion.total_opportunities || 0}\n`;
-        csv += `Won Opportunities,${data.conversion_ratios.sales_conversion.won_opportunities || 0}\n`;
-        csv += `Win Rate,${data.conversion_ratios.sales_conversion.win_rate || 0}%\n`;
-        csv += '\n';
-      }
-
-      if (data.conversion_ratios.customer_conversion) {
-        csv += 'Customer Conversion\n';
-        csv += 'Metric,Value\n';
-        csv += `Total Leads,${data.conversion_ratios.customer_conversion.total_leads || 0}\n`;
-        csv += `Converted Customers,${data.conversion_ratios.customer_conversion.converted_customers || 0}\n`;
-        csv += `Conversion Rate,${data.conversion_ratios.customer_conversion.conversion_rate || 0}%\n`;
-        csv += '\n';
-      }
+      sections.push(objectToCSV(data.conversion_ratios, 'Conversion Ratios'));
     }
 
-    return csv;
+    // Add metadata
+    sections.push(`\n"Export Information"`);
+    sections.push(`"Exported At","${data.exported_at}"`);
+    sections.push(`"Exported By","${data.exported_by}"`);
+    sections.push(`"Date Range","${data.filters.date_range.startDate} to ${data.filters.date_range.endDate}"`);
+    sections.push(`"Grouping","${data.filters.grouping}"`);
+
+    return sections.join('\n\n');
   };
 
   const handleDateRangeChange = (field, value) => {
@@ -346,66 +342,55 @@ const Analytics = () => {
     setGrouping('month');
   };
 
-  if (loading && !dashboardData) {
+  if (loading) {
     return (
-      <Container maxWidth="xl">
-        <Box my={4}>
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight={400}>
-            <CircularProgress size={60} />
-          </Box>
+      <Container>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <CircularProgress />
         </Box>
       </Container>
     );
   }
 
   return (
-    <Container maxWidth="xl">
-      <Box my={4}>
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Box>
         {/* Header */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              <AssessmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
               Analytics Dashboard
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              Comprehensive analytics and insights for your CRM data
+              View performance metrics and insights for your CRM data
             </Typography>
           </Box>
-          <Box display="flex" gap={1}>
-            <IconButton 
-              onClick={() => setFilterExpanded(!filterExpanded)}
-              color={filterExpanded ? "primary" : "default"}
-            >
-              {filterExpanded ? <ExpandLessIcon /> : <FilterIcon />}
-            </IconButton>
+          <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="outlined"
-              startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshIcon />}
+              startIcon={<RefreshIcon />}
               onClick={handleRefresh}
-              disabled={loading || refreshing || exporting}
+              disabled={refreshing}
             >
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
             <Button
               variant="contained"
-              startIcon={exporting ? <CircularProgress size={16} /> : <DownloadIcon />}
+              startIcon={<DownloadIcon />}
               onClick={handleExport}
-              disabled={loading || refreshing || exporting}
+              disabled={exporting}
             >
-              {exporting ? 'Exporting...' : 'Export'}
+              {exporting ? 'Exporting...' : 'Export Data'}
             </Button>
           </Box>
         </Box>
 
-        {/* Error Alert */}
+        {/* Messages */}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
-
-        {/* Success Message */}
         {successMessage && (
           <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage(null)}>
             {successMessage}
@@ -413,13 +398,23 @@ const Analytics = () => {
         )}
 
         {/* Filters */}
-        <Collapse in={filterExpanded}>
-          <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Filters & Options
+        <Paper sx={{ p: 3, mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <FilterIcon />
+            <Typography variant="h6" fontWeight="bold">
+              Filters
             </Typography>
-            <Grid container spacing={3} alignItems="center">
-              <Grid item xs={12} sm={3}>
+            <IconButton
+              onClick={() => setFilterExpanded(!filterExpanded)}
+              sx={{ ml: 'auto' }}
+            >
+              {filterExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+          
+          <Collapse in={filterExpanded}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={3}>
                 <TextField
                   label="Start Date"
                   type="date"
@@ -429,7 +424,7 @@ const Analytics = () => {
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
-              <Grid item xs={12} sm={3}>
+              <Grid item xs={12} md={3}>
                 <TextField
                   label="End Date"
                   type="date"
@@ -439,135 +434,178 @@ const Analytics = () => {
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
-              <Grid item xs={12} sm={3}>
+              <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Grouping</InputLabel>
+                  <InputLabel>Group By</InputLabel>
                   <Select
                     value={grouping}
-                    label="Grouping"
+                    label="Group By"
                     onChange={(e) => setGrouping(e.target.value)}
                   >
-                    <MenuItem value="day">Daily</MenuItem>
-                    <MenuItem value="week">Weekly</MenuItem>
-                    <MenuItem value="month">Monthly</MenuItem>
+                    <MenuItem value="day">Day</MenuItem>
+                    <MenuItem value="week">Week</MenuItem>
+                    <MenuItem value="month">Month</MenuItem>
+                    <MenuItem value="quarter">Quarter</MenuItem>
+                    <MenuItem value="year">Year</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={3}>
+              <Grid item xs={12} md={3}>
                 <Button
                   variant="outlined"
                   onClick={handleClearFilters}
                   fullWidth
+                  sx={{ height: '100%' }}
                 >
                   Clear Filters
                 </Button>
               </Grid>
             </Grid>
-          </Paper>
-        </Collapse>
+          </Collapse>
+        </Paper>
 
-        {/* KPI Cards */}
+        {/* Dashboard KPIs */}
         {dashboardData && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
-                title="Sales This Month"
-                value={chartUtils.formatCurrency(dashboardData.sales?.current_month_amount || 0)}
-                change={chartUtils.calculateChange(
-                  dashboardData.sales?.current_month_amount || 0,
-                  dashboardData.sales?.previous_month_amount || 0
-                )}
-                changeType={
-                  (dashboardData.sales?.current_month_amount || 0) >= 
-                  (dashboardData.sales?.previous_month_amount || 0) ? 'positive' : 'negative'
+                title="Total Sales"
+                value={chartUtils.formatCurrency(dashboardData.total_sales_amount || 0)}
+                icon={<TrendingUpIcon />}
+                color="primary"
+                trend={dashboardData.sales_change !== undefined}
+                trendValue={`${chartUtils.calculateChange(
+                  dashboardData.total_sales_amount || 0,
+                  dashboardData.previous_sales_amount || 0
+                )}%`}
+                trendDirection={
+                  (dashboardData.total_sales_amount || 0) >= (dashboardData.previous_sales_amount || 0) 
+                    ? 'up' : 'down'
                 }
-                subtitle="Current month performance"
-                icon={<TrendingUpIcon />}
+                subtitle="This period"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
-                title="Active Customers"
-                value={dashboardData.customers?.active_customers || 0}
-                subtitle={`${dashboardData.customers?.new_customers || 0} new this month`}
-                icon={<TrendingUpIcon />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <MetricCard
-                title="Task Completion"
-                value={`${(dashboardData.tasks?.completion_rate || 0).toFixed(1)}%`}
-                subtitle={`${dashboardData.tasks?.completed_tasks || 0}/${(dashboardData.tasks?.completed_tasks || 0) + (dashboardData.tasks?.pending_tasks || 0)} tasks`}
-                icon={<TrendingUpIcon />}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <ProgressBarChart
-                title="Sales Won This Month"
-                value={dashboardData.sales?.won_this_month || 0}
-                max={dashboardData.sales?.current_month_count || 1}
+                title="Total Customers"
+                value={chartUtils.formatLargeNumber(dashboardData.total_customers || 0)}
+                icon={<AssessmentIcon />}
                 color="success"
+                trend={dashboardData.customer_change !== undefined}
+                trendValue={`${chartUtils.calculateChange(
+                  dashboardData.total_customers || 0,
+                  dashboardData.previous_customers || 0
+                )}%`}
+                trendDirection={
+                  (dashboardData.total_customers || 0) >= (dashboardData.previous_customers || 0) 
+                    ? 'up' : 'down'
+                }
+                subtitle="Active customers"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard
+                title="Avg Deal Size"
+                value={chartUtils.formatCurrency(dashboardData.avg_deal_size || 0)}
+                icon={<TrendingUpIcon />}
+                color="warning"
+                trend={dashboardData.deal_size_change !== undefined}
+                trendValue={`${chartUtils.calculateChange(
+                  dashboardData.avg_deal_size || 0,
+                  dashboardData.previous_avg_deal_size || 0
+                )}%`}
+                trendDirection={
+                  (dashboardData.avg_deal_size || 0) >= (dashboardData.previous_avg_deal_size || 0) 
+                    ? 'up' : 'down'
+                }
+                subtitle="Per sale"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <MetricCard
+                title="Conversion Rate"
+                value={`${(dashboardData.conversion_rate || 0).toFixed(1)}%`}
+                icon={<AssessmentIcon />}
+                color="info"
+                trend={dashboardData.conversion_change !== undefined}
+                trendValue={`${chartUtils.calculateChange(
+                  dashboardData.conversion_rate || 0,
+                  dashboardData.previous_conversion_rate || 0
+                )}%`}
+                trendDirection={
+                  (dashboardData.conversion_rate || 0) >= (dashboardData.previous_conversion_rate || 0) 
+                    ? 'up' : 'down'
+                }
+                subtitle="Lead to customer"
               />
             </Grid>
           </Grid>
         )}
 
-        {/* Charts Section */}
-        {salesData && (
+        {/* Charts */}
+        {salesData && salesData.time_series && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} lg={8}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Sales Performance Over Time
-                </Typography>
-                <LineChart
-                  data={chartUtils.formatMultiSeriesData(salesData.sales_over_time || [], [
-                    { label: 'Sales Count', key: 'count' },
-                    { label: 'Total Amount ($)', key: 'total_amount' }
-                  ])}
-                  height={350}
-                />
-              </Paper>
+            <Grid item xs={12} md={6}>
+              <LineChart
+                title="Sales Performance Over Time"
+                data={salesData.time_series.map(item => ({
+                  name: item.period,
+                  value: item.total_amount || 0,
+                  count: item.total_sales || 0
+                }))}
+                lines={[
+                  { dataKey: 'value', name: 'Amount' },
+                  { dataKey: 'count', name: 'Count' }
+                ]}
+                colors={['#1976d2', '#dc004e']}
+                height={350}
+              />
             </Grid>
-            <Grid item xs={12} lg={4}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Sales by Status
-                </Typography>
-                <PieChart
-                  data={chartUtils.formatPieData(salesData.sales_by_status || [], 'status', 'count')}
-                  height={350}
-                />
-              </Paper>
+            <Grid item xs={12} md={6}>
+              <BarChart
+                title="Monthly Sales Comparison"
+                data={salesData.time_series.slice(-6).map(item => ({
+                  name: item.period,
+                  value: item.total_amount || 0
+                }))}
+                bars={[{ dataKey: 'value', name: 'Sales Amount' }]}
+                colors={['#1976d2']}
+                height={350}
+              />
             </Grid>
           </Grid>
         )}
 
-        {/* Customer and Task Analytics */}
-        {customerData && taskData && (
+        {/* Customer Engagement & Task Progress */}
+        {(customerData || taskData) && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Customer Engagement Levels
-                </Typography>
-                <DoughnutChart
-                  data={chartUtils.formatPieData(customerData.engagement_levels || [], 'engagement_level', 'count')}
-                  height={300}
+            {customerData && customerData.engagement_distribution && (
+              <Grid item xs={12} md={6}>
+                <DonutChart
+                  title="Customer Engagement Distribution"
+                  data={customerData.engagement_distribution.map(item => ({
+                    name: item.engagement_level,
+                    value: item.count
+                  }))}
+                  colors={['#1976d2', '#dc004e', '#ed6c02', '#2e7d32']}
+                  height={350}
+                  centerText="Total"
+                  centerValue={customerData.engagement_distribution.reduce((sum, item) => sum + item.count, 0)}
                 />
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Tasks by Priority
-                </Typography>
-                <BarChart
-                  data={chartUtils.formatPieData(taskData.tasks_by_priority || [], 'priority', 'count')}
-                  height={300}
+              </Grid>
+            )}
+
+            {taskData && taskData.completion_progress && (
+              <Grid item xs={12} md={6}>
+                <ProgressChart
+                  title="Task Completion Progress"
+                  value={taskData.completion_progress.completed_tasks || 0}
+                  total={taskData.completion_progress.total_tasks || 1}
+                  color="success"
+                  subtitle={`${((taskData.completion_progress.completed_tasks || 0) / (taskData.completion_progress.total_tasks || 1) * 100).toFixed(1)}% Complete`}
                 />
-              </Paper>
-            </Grid>
+              </Grid>
+            )}
           </Grid>
         )}
 

@@ -27,7 +27,7 @@ const TasksPage = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10); // For pagination
 
     const { user } = useContext(AuthContext);
-    const isManager = user?.role === 'ADMIN' || user?.is_staff; // Ensure this matches your user model
+    const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER'; // Allow both ADMIN and MANAGER roles
 
     const fetchTasks = useCallback(async () => {
         setIsLoading(true);

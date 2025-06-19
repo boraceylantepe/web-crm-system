@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
-from api.serializers import UserSerializer, PasswordChangeSerializer
+from api.serializers import UserSerializer, PasswordChangeSerializer, ProfileSerializer
 from api.permissions import IsAdmin, IsAdminOrManager, CanEditUserInfo
 
 User = get_user_model()
@@ -250,3 +250,35 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['get', 'put', 'patch'], permission_classes=[permissions.IsAuthenticated])
+    def profile(self, request):
+        """
+        Get or update the current user's profile.
+        """
+        user = request.user
+        
+        if request.method == 'GET':
+            serializer = ProfileSerializer(user)
+            print(f"Profile GET for user {user.username}: {serializer.data}")
+            return Response(serializer.data)
+        
+        elif request.method in ['PUT', 'PATCH']:
+            print(f"Profile {request.method} for user {user.username}")
+            print(f"Request data: {request.data}")
+            print(f"Request FILES: {request.FILES}")
+            
+            serializer = ProfileSerializer(user, data=request.data, partial=request.method == 'PATCH')
+            if serializer.is_valid():
+                print(f"Serializer is valid, validated_data: {serializer.validated_data}")
+                updated_user = serializer.save()
+                print(f"User saved, profile_picture: {updated_user.profile_picture}")
+                print(f"Profile picture URL: {updated_user.get_profile_picture_url()}")
+                
+                # Return fresh data
+                response_serializer = ProfileSerializer(updated_user)
+                print(f"Response data: {response_serializer.data}")
+                return Response(response_serializer.data)
+            else:
+                print(f"Serializer errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

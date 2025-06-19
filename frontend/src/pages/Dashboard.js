@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Grid,
   Paper,
@@ -11,7 +11,29 @@ import {
   ListItemText,
   CircularProgress,
   Button,
-  Chip
+  Chip,
+  Card,
+  CardContent,
+  CardHeader,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  Avatar,
+  LinearProgress,
+  Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Breadcrumbs,
+  Checkbox,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -19,7 +41,16 @@ import {
   Task as TaskIcon,
   Event as CalendarIcon,
   ArrowForward as ArrowForwardIcon,
-  AccessTime as TimeIcon
+  AccessTime as TimeIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  MoreVert as MoreVertIcon,
+  Visibility as VisibilityIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Home as HomeIcon,
+  NavigateNext as NavigateNextIcon
 } from '@mui/icons-material';
 import { AuthContext } from '../context/AuthContext';
 import { getCustomers } from '../services/customerService';
@@ -30,259 +61,370 @@ import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { LineChart, MetricCard } from '../components/charts/ChartComponents';
 import reportingService from '../services/reportingService';
 
-const StatWidget = ({ title, value, icon, color, link }) => {
+const KPICard = ({ title, value, icon, color, trend, trendValue, trendDirection, period, link }) => {
+  const TrendIcon = trendDirection === 'up' ? TrendingUpIcon : TrendingDownIcon;
+  const trendColor = trendDirection === 'up' ? 'success.main' : 'error.main';
+  
   return (
-    <Paper
-      elevation={3}
+    <Card
+      elevation={0}
       sx={{
-        p: 3,
-        display: 'flex',
-        flexDirection: 'column',
         height: '100%',
-        position: 'relative',
-        overflow: 'hidden'
+        border: 1,
+        borderColor: 'divider',
+        transition: 'all 0.3s ease-in-out',
+        cursor: link ? 'pointer' : 'default',
+        '&:hover': {
+          transform: link ? 'translateY(-4px)' : 'none',
+          boxShadow: link ? 4 : 1,
+        }
       }}
+      onClick={link ? () => window.location.href = link : undefined}
     >
-      <Box
-        sx={{
-          position: 'absolute',
-          top: -20,
-          right: -20,
-          opacity: 0.1,
-          transform: 'rotate(10deg)',
-          fontSize: '8rem'
-        }}
-      >
-        {icon}
-      </Box>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
       <Box>
-        <Typography variant="h6" component="h2" gutterBottom>
+            <Typography variant="h6" color="text.secondary" sx={{ fontSize: '0.875rem', fontWeight: 500, mb: 1 }}>
           {title}
         </Typography>
-        <Typography variant="h3" component="div" sx={{ color }}>
+            <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, color: 'text.primary' }}>
           {value}
         </Typography>
+            {trend && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <TrendIcon sx={{ fontSize: 16, color: trendColor }} />
+                <Typography variant="body2" sx={{ color: trendColor, fontWeight: 'medium' }}>
+                  {trendValue}
+                </Typography>
+              </Box>
+            )}
       </Box>
-      <Box sx={{ mt: 2 }}>
-        <Button
-          component={Link}
-          to={link}
-          variant="outlined"
-          size="small"
-          sx={{ color, borderColor: color }}
-        >
-          View Details
-        </Button>
+          <Box
+            sx={{
+              bgcolor: `${color}.light`,
+              borderRadius: 2,
+              p: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {React.cloneElement(icon, { sx: { color: `${color}.main`, fontSize: 24 } })}
+          </Box>
       </Box>
-    </Paper>
+        
+        {period && (
+          <Typography variant="caption" color="text.secondary">
+            {period}
+          </Typography>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
-const RecentItemsList = ({ title, items, loading, emptyMessage, link, renderItem, icon, color }) => {
+const DataTableCard = ({ 
+  title, 
+  data, 
+  loading, 
+  emptyMessage, 
+  link, 
+  icon, 
+  color,
+  columns,
+  renderRow,
+  actions = []
+}) => {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [timeFilter, setTimeFilter] = useState('This Week');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selected, setSelected] = useState([]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleSelectAll = (event) => {
+    if (event.target.checked) {
+      setSelected(data.map((_, index) => index));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectOne = (index) => {
+    setSelected(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else {
+        return [...prev, index];
+      }
+    });
+  };
+
+  const filteredData = data.filter(item => {
+    if (!searchQuery) return true;
+    return Object.values(item).some(value => 
+      String(value).toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 3,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        minHeight: '300px'
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ mr: 1, color }}>{icon}</Box>
-        <Typography variant="h6" component="h2">
+    <Card elevation={0} sx={{ height: '100%', border: 1, borderColor: 'divider' }}>
+      <CardHeader
+        title={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {icon && React.cloneElement(icon, { sx: { color: `${color}.main` } })}
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
           {title}
         </Typography>
       </Box>
-      <Divider sx={{ mb: 2 }} />
+        }
+        action={
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <TextField
+              size="small"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: 200 }}
+            />
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="This Week">This Week</MenuItem>
+                <MenuItem value="This Month">This Month</MenuItem>
+                <MenuItem value="Last Month">Last Month</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        }
+        sx={{ pb: 1 }}
+      />
+      <Divider />
       
+      <CardContent sx={{ p: 0, height: 'calc(100% - 140px)', display: 'flex', flexDirection: 'column' }}>
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
           <CircularProgress />
         </Box>
-      ) : items.length > 0 ? (
-        <List sx={{ flex: 1, overflowY: 'auto' }}>
-          {items.map(renderItem)}
-        </List>
+        ) : filteredData.length > 0 ? (
+          <>
+            <TableContainer sx={{ flex: 1 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>
+                      <Checkbox
+                        indeterminate={selected.length > 0 && selected.length < data.length}
+                        checked={data.length > 0 && selected.length === data.length}
+                        onChange={handleSelectAll}
+                      />
+                    </TableCell>
+                    {columns.map((column) => (
+                      <TableCell 
+                        key={column.id}
+                        align={column.align || 'left'}
+                        sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}
+                      >
+                        {column.label}
+                      </TableCell>
+                    ))}
+                    <TableCell align="center" sx={{ fontWeight: 'bold', bgcolor: 'background.paper' }}>
+                      Action
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {paginatedData.map((row, index) => (
+                    <TableRow 
+                      key={index}
+                      hover
+                      selected={selected.includes(index)}
+                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selected.includes(index)}
+                          onChange={() => handleSelectOne(index)}
+                        />
+                      </TableCell>
+                      {renderRow(row, index)}
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          <IconButton size="small" color="primary">
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="primary">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" color="error">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1, borderTop: 1, borderColor: 'divider' }}>
+              <Typography variant="body2" color="text.secondary">
+                Items per page:
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <FormControl size="small">
+                  <Select
+                    value={rowsPerPage}
+                    onChange={handleChangeRowsPerPage}
+                  >
+                    <MenuItem value={5}>5</MenuItem>
+                    <MenuItem value={10}>10</MenuItem>
+                    <MenuItem value={15}>15</MenuItem>
+                  </Select>
+                </FormControl>
+                <Typography variant="body2" color="text.secondary">
+                  {page * rowsPerPage + 1} – {Math.min((page + 1) * rowsPerPage, filteredData.length)} of {filteredData.length}
+                </Typography>
+                <TablePagination
+                  component="div"
+                  count={filteredData.length}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                  showFirstButton
+                  showLastButton
+                  labelDisplayedRows={() => ''}
+                  labelRowsPerPage=""
+                  sx={{ '.MuiTablePagination-toolbar': { minHeight: 'auto' } }}
+                />
+              </Box>
+            </Box>
+          </>
       ) : (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-          <Typography variant="body1" color="text.secondary">
-            {emptyMessage}
-          </Typography>
+            <Typography color="text.secondary">{emptyMessage}</Typography>
         </Box>
       )}
-      
-      <Box sx={{ mt: 'auto', pt: 2 }}>
-        <Button component={Link} to={link} variant="text" sx={{ color }}>
-          View All
-        </Button>
-      </Box>
-    </Paper>
+      </CardContent>
+    </Card>
   );
 };
 
 const Dashboard = () => {
-  const [stats, setStats] = useState({
-    customers: 0,
-    sales: 0,
-    tasks: 0,
-    events: 0
-  });
-  
-  const [recentTasks, setRecentTasks] = useState([]);
-  const [recentSales, setRecentSales] = useState([]);
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
-  const [salesPipeline, setSalesPipeline] = useState({});
-  const [salesStats, setSalesStats] = useState({});
-  const [analyticsData, setAnalyticsData] = useState(null);
-  
-  const [loading, setLoading] = useState({
-    stats: true,
-    tasks: true,
-    sales: true,
-    events: true,
-    pipeline: true,
-    analytics: true
-  });
-  
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   
-  // Status colors mapping
-  const statusColors = {
-    'NEW': 'primary',
-    'CONTACTED': 'info',
-    'PROPOSAL': 'warning',
-    'NEGOTIATION': 'secondary',
-    'WON': 'success',
-    'LOST': 'error'
-  };
+  const [dashboardData, setDashboardData] = useState({
+    customers: [],
+    recentSales: [],
+    tasks: [],
+    events: [],
+    stats: {},
+    kpis: null,
+    salesStats: null,
+    loading: true,
+  });
 
-  // Status display mapping
-  const statusDisplay = {
-    'NEW': 'New',
-    'CONTACTED': 'Contacted',
-    'PROPOSAL': 'Proposal Sent',
-    'NEGOTIATION': 'Negotiation',
-    'WON': 'Won',
-    'LOST': 'Lost'
-  };
-  
-  // Helper functions for task status and priority
   const getStatusDisplay = (status) => {
-    switch(status) {
-      case 'P': return 'Pending';
-      case 'IP': return 'In Progress';
-      case 'C': return 'Completed';
-      case 'O': return 'Overdue';
-      default: return status;
-    }
+    const statusMap = {
+      'PENDING': 'Pending',
+      'IN_PROGRESS': 'In Progress', 
+      'COMPLETED': 'Completed',
+      'CANCELLED': 'Cancelled'
+    };
+    return statusMap[status] || status;
   };
   
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'P': return 'warning';
-      case 'IP': return 'primary';
-      case 'C': return 'success';
-      case 'O': return 'error';
-      default: return 'default';
-    }
+    const colorMap = {
+      'PENDING': 'warning',
+      'IN_PROGRESS': 'primary',
+      'COMPLETED': 'success',
+      'CANCELLED': 'error'
+    };
+    return colorMap[status] || 'default';
   };
   
   const getPriorityDisplay = (priority) => {
-    switch(priority) {
-      case 'L': return 'Low';
-      case 'M': return 'Medium';
-      case 'H': return 'High';
-      default: return priority;
-    }
+    const priorityMap = {
+      'LOW': 'Low',
+      'MEDIUM': 'Medium',
+      'HIGH': 'High',
+      'URGENT': 'Urgent'
+    };
+    return priorityMap[priority] || priority;
   };
   
   const getPriorityColor = (priority) => {
-    switch(priority) {
-      case 'L': return 'success';
-      case 'M': return 'warning';
-      case 'H': return 'error';
-      default: return 'default';
-    }
+    const colorMap = {
+      'LOW': 'success',
+      'MEDIUM': 'primary',
+      'HIGH': 'warning',
+      'URGENT': 'error'
+    };
+    return colorMap[priority] || 'default';
   };
   
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // 1. Fetch customers
-        const customersData = await getCustomers();
-        const customersCount = Array.isArray(customersData.results) 
-          ? customersData.results.length 
-          : (customersData.count || 0);
-        
-        // 2. Fetch sales pipeline and stats
-        const pipelineData = await getSalesPipeline();
-        setSalesPipeline(pipelineData);
-        setLoading(prev => ({ ...prev, pipeline: false }));
-        
-        const statsData = await getSalesStats();
-        setSalesStats(statsData);
-        
-        // 3. Calculate total opportunities
-        const totalSales = Object.values(pipelineData || {}).reduce(
-          (total, status) => total + (Array.isArray(status) ? status.length : 0), 
-          0
-        );
-        
-        // 4. Get recent sales
-        const salesData = await getSales({ limit: 3, ordering: '-updated_at' });
-        const recentSalesData = Array.isArray(salesData.results) 
-          ? salesData.results 
-          : [];
-        
-        setRecentSales(recentSalesData);
-        setLoading(prev => ({ ...prev, sales: false }));
-        
-        // 5. Fetch task statistics
-        const taskStatsData = await taskService.getTaskStats();
-        
-        // 6. Fetch actual tasks data
-        const recentTasksData = await taskService.getUpcomingTasks(3);
-        setRecentTasks(recentTasksData);
-        setLoading(prev => ({ ...prev, tasks: false }));
-        
-        // 7. Fetch upcoming events data
-        const upcomingEventsData = await calendarService.getUpcomingEvents(3);
-        setUpcomingEvents(upcomingEventsData);
-        setLoading(prev => ({ ...prev, events: false }));
-        
-        // 8. Update stats with actual counts
-        setStats({
-          customers: customersCount,
-          sales: totalSales,
-          tasks: taskStatsData.active_tasks || 0,
-          events: upcomingEventsData.length || 0
+        const [
+          customersResponse,
+          salesResponse,
+          tasksResponse,
+          eventsResponse,
+          salesStatsResponse,
+          kpisResponse
+        ] = await Promise.all([
+          getCustomers({ limit: 10 }),
+          getSales({ limit: 10 }),
+          taskService.getTasks({ limit: 10 }),
+          calendarService.getCalendarEvents({ limit: 10 }),
+          getSalesStats(),
+          reportingService.analytics.getDashboardKPIs()
+        ]);
+
+        const stats = {
+          totalCustomers: customersResponse.count || customersResponse.length || 0,
+          totalSales: salesResponse.count || salesResponse.length || 0,
+          pendingTasks: tasksResponse.results?.filter(task => task.status === 'PENDING').length || 0,
+          upcomingEvents: eventsResponse.results?.length || 0,
+        };
+
+        setDashboardData({
+          customers: customersResponse.results || customersResponse || [],
+          recentSales: salesResponse.results || salesResponse || [],
+          tasks: tasksResponse.results || tasksResponse || [],
+          events: eventsResponse.results || eventsResponse || [],
+          stats,
+          kpis: kpisResponse.data,
+          salesStats: salesStatsResponse,
+          loading: false,
         });
-        setLoading(prev => ({ ...prev, stats: false }));
-        
-        // 9. Load basic analytics data for the widget
-        try {
-          const dashboardKPIs = await reportingService.analytics.getDashboardKPIs();
-          setAnalyticsData(dashboardKPIs.data);
-          setLoading(prev => ({ ...prev, analytics: false }));
-        } catch (error) {
-          console.error('Error loading analytics:', error);
-          setLoading(prev => ({ ...prev, analytics: false }));
-        }
-        
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        // Set loading states to false on error
-        setLoading({
-          stats: false,
-          tasks: false,
-          sales: false,
-          events: false,
-          pipeline: false,
-          analytics: false
-        });
+        setDashboardData(prev => ({ ...prev, loading: false }));
       }
     };
     
@@ -293,245 +435,223 @@ const Dashboard = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
     }).format(amount);
   };
+
+  const formatLargeNumber = (value) => {
+    if (value >= 1000000) {
+      return (value / 1000000).toFixed(1) + 'M';
+    }
+    if (value >= 1000) {
+      return (value / 1000).toFixed(1) + 'K';
+    }
+    return value.toString();
+  };
+
+  const calculatePercentageChange = (current, previous) => {
+    if (!previous || previous === 0) return 0;
+    return ((current - previous) / previous * 100).toFixed(2);
+  };
+
+  const customerColumns = [
+    { id: 'customer', label: 'Customer' },
+    { id: 'email', label: 'Email' },
+    { id: 'phone', label: 'Phone' },
+    { id: 'created_at', label: 'Created Date' },
+    { id: 'status', label: 'Status' },
+  ];
+
+  const renderCustomerRow = (customer, index) => (
+    <>
+      <TableCell>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.875rem' }}>
+            {customer.name?.charAt(0) || customer.first_name?.charAt(0) || 'U'}
+          </Avatar>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+              {customer.name || `${customer.first_name} ${customer.last_name}`}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Customer ID #{customer.id}
+            </Typography>
+          </Box>
+        </Box>
+      </TableCell>
+      <TableCell>{customer.email}</TableCell>
+      <TableCell>{customer.phone || 'N/A'}</TableCell>
+      <TableCell>{formatDate(customer.created_at)}</TableCell>
+      <TableCell>
+        <Chip 
+          label={customer.is_active ? 'Active' : 'Inactive'} 
+          color={customer.is_active ? 'success' : 'default'}
+          size="small"
+        />
+      </TableCell>
+    </>
+  );
+
+  const taskColumns = [
+    { id: 'task', label: 'Task' },
+    { id: 'assigned_to', label: 'Assigned To' },
+    { id: 'due_date', label: 'Due Date' },
+    { id: 'priority', label: 'Priority' },
+    { id: 'status', label: 'Status' },
+  ];
+
+  const renderTaskRow = (task, index) => (
+    <>
+      <TableCell>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+            #{task.id}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {task.title}
+          </Typography>
+        </Box>
+      </TableCell>
+      <TableCell>{task.assigned_to_name || 'Unassigned'}</TableCell>
+      <TableCell>{task.due_date ? formatDate(task.due_date) : 'No due date'}</TableCell>
+      <TableCell>
+        <Chip 
+          label={getPriorityDisplay(task.priority)} 
+          color={getPriorityColor(task.priority)}
+          size="small"
+        />
+      </TableCell>
+      <TableCell>
+        <Chip 
+          label={getStatusDisplay(task.status)} 
+          color={getStatusColor(task.status)}
+          size="small"
+        />
+      </TableCell>
+    </>
+  );
+
+  if (dashboardData.loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+        // Calculate real dashboard metrics from the actual data
+      // Note: Backend already filters data based on user role (USER sees only their data, MANAGER/ADMIN see all)
+      const totalCustomers = dashboardData.customers.length || 0;
+      
+      // Calculate pipeline value from sales data (excluding WON and LOST)
+      const pipelineValue = dashboardData.recentSales
+        .filter(sale => sale.status && !['WON', 'LOST'].includes(sale.status))
+        .reduce((total, sale) => total + (parseFloat(sale.amount) || 0), 0);
+      
+      // Calculate active tasks (pending and in progress)
+      const activeTasks = dashboardData.tasks
+        .filter(task => task.status && ['P', 'IP'].includes(task.status)).length || 0;
+      
+      // Calculate upcoming events (today + next 3 days)
+      const today = new Date();
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(today.getDate() + 3);
+      
+      const upcomingEvents = dashboardData.events
+        .filter(event => {
+          if (!event.start_time) return false;
+          const eventDate = new Date(event.start_time);
+          return eventDate >= today && eventDate <= threeDaysFromNow;
+        }).length || 0;
   
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Welcome back, {user?.first_name}!
+    <Box sx={{ flexGrow: 1 }}>
+      {/* Breadcrumbs */}
+      <Box sx={{ mb: 3 }}>
+        <Breadcrumbs 
+          aria-label="breadcrumb"
+          separator={<NavigateNextIcon fontSize="small" />}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <HomeIcon fontSize="small" />
+            <Typography color="text.primary" sx={{ fontWeight: 'medium' }}>
+              Dashboard
       </Typography>
-      <Typography variant="body1" color="text.secondary" gutterBottom>
-        Here's what's happening with your CRM today.
-      </Typography>
+          </Box>
+        </Breadcrumbs>
+      </Box>
       
-      {/* Statistics Overview */}
+      {/* KPI Cards - Now using real data from tabs */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <StatWidget
+          <KPICard
             title="Total Customers"
-            value={loading.stats ? <CircularProgress size={24} /> : stats.customers}
+            value={formatLargeNumber(totalCustomers)}
             icon={<PeopleIcon />}
-            color="primary.main"
+            color="primary"
+            trend={false}
+            period="All Customers"
             link="/customers"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatWidget
-            title="Active Sales"
-            value={loading.sales ? <CircularProgress size={24} /> : stats.sales}
+          <KPICard
+            title="Pipeline Value"
+            value={formatCurrency(pipelineValue)}
             icon={<SalesIcon />}
-            color="success.main"
+            color="success"
+            trend={false}
+            period="Active Opportunities"
             link="/sales"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatWidget
-            title="Open Tasks"
-            value={loading.tasks ? <CircularProgress size={24} /> : stats.tasks}
+          <KPICard
+            title="Active Tasks"
+            value={formatLargeNumber(activeTasks)}
             icon={<TaskIcon />}
-            color="warning.main"
+            color="warning"
+            trend={false}
+            period="Pending & In Progress"
             link="/tasks"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <StatWidget
+          <KPICard
             title="Upcoming Events"
-            value={loading.events ? <CircularProgress size={24} /> : stats.events}
+            value={formatLargeNumber(upcomingEvents)}
             icon={<CalendarIcon />}
-            color="info.main"
+            color="info"
+            trend={false}
+            period="Next 3 Days"
             link="/calendar"
           />
         </Grid>
       </Grid>
 
-      {/* Analytics Widget */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12}>
-          <Paper elevation={3} sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" component="h2">
-                Quick Analytics
-              </Typography>
-              <Button 
-                component={Link} 
-                to="/analytics" 
-                variant="outlined" 
-                size="small"
-                endIcon={<ArrowForwardIcon />}
-              >
-                View Full Analytics
-              </Button>
-            </Box>
-            <Divider sx={{ mb: 2 }} />
-            
-            {loading.analytics ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : analyticsData ? (
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <MetricCard
-                    title="Sales This Month"
-                    value={formatCurrency(analyticsData.sales?.current_month_amount || 0)}
-                    subtitle="Current month performance"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <MetricCard
-                    title="New Customers"
-                    value={analyticsData.customers?.new_customers || 0}
-                    subtitle="This month"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <MetricCard
-                    title="Task Completion"
-                    value={`${(analyticsData.tasks?.completion_rate || 0).toFixed(1)}%`}
-                    subtitle="Current rate"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                  <MetricCard
-                    title="Active Customers"
-                    value={analyticsData.customers?.active_customers || 0}
-                    subtitle="Total active"
-                  />
-                </Grid>
-              </Grid>
-            ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-                Analytics data not available
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-      
-      {/* Recent Activities Grid */}
+      {/* Data Tables */}
       <Grid container spacing={3}>
-        {/* Recent Tasks */}
-        <Grid item xs={12} md={4}>
-          <RecentItemsList
+        <Grid item xs={12} lg={6}>
+          <DataTableCard
+            title="Top Customers"
+            data={dashboardData.customers}
+            loading={dashboardData.loading}
+            emptyMessage="No customers found"
+            icon={<PeopleIcon />}
+            color="primary"
+            columns={customerColumns}
+            renderRow={renderCustomerRow}
+          />
+        </Grid>
+        <Grid item xs={12} lg={6}>
+          <DataTableCard
             title="Recent Tasks"
-            items={recentTasks}
-            loading={loading.tasks}
-            emptyMessage="No recent tasks"
-            link="/tasks"
+            data={dashboardData.tasks}
+            loading={dashboardData.loading}
+            emptyMessage="No tasks found"
             icon={<TaskIcon />}
-            color="warning.main"
-            renderItem={(task, index) => (
-              <ListItem key={task.id || index} disablePadding>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" noWrap>
-                        {task.title}
-                      </Typography>
-                      <Chip
-                        label={getStatusDisplay(task.status)}
-                        color={getStatusColor(task.status)}
-                        size="small"
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box>
-                      <Typography variant="caption" display="block">
-                        Due: {formatDate(task.due_date)}
-                      </Typography>
-                      <Chip
-                        label={getPriorityDisplay(task.priority)}
-                        color={getPriorityColor(task.priority)}
-                        size="small"
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                  }
-                />
-              </ListItem>
-            )}
-          />
-        </Grid>
-        
-        {/* Recent Sales */}
-        <Grid item xs={12} md={4}>
-          <RecentItemsList
-            title="Recent Sales"
-            items={recentSales}
-            loading={loading.sales}
-            emptyMessage="No recent sales"
-            link="/sales"
-            icon={<SalesIcon />}
-            color="success.main"
-            renderItem={(sale, index) => (
-              <ListItem key={sale.id || index} disablePadding>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" noWrap>
-                        {sale.customer?.company_name || sale.customer?.first_name + ' ' + sale.customer?.last_name}
-                      </Typography>
-                      <Chip
-                        label={statusDisplay[sale.status] || sale.status}
-                        color={statusColors[sale.status] || 'default'}
-                        size="small"
-                      />
-                    </Box>
-                  }
-                  secondary={
-                    <Box>
-                      <Typography variant="caption" display="block">
-                        Value: {formatCurrency(sale.amount)}
-                      </Typography>
-                      <Typography variant="caption" display="block">
-                        Updated: {formatDate(sale.updated_at)}
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </ListItem>
-            )}
-          />
-        </Grid>
-        
-        {/* Upcoming Events */}
-        <Grid item xs={12} md={4}>
-          <RecentItemsList
-            title="Upcoming Events"
-            items={upcomingEvents}
-            loading={loading.events}
-            emptyMessage="No upcoming events"
-            link="/calendar"
-            icon={<CalendarIcon />}
-            color="info.main"
-            renderItem={(event, index) => (
-              <ListItem key={event.id || index} disablePadding>
-                <ListItemText
-                  primary={
-                    <Typography variant="body2" noWrap>
-                      {event.title}
-                    </Typography>
-                  }
-                  secondary={
-                    <Box>
-                      <Typography variant="caption" display="block">
-                        <TimeIcon sx={{ fontSize: 12, mr: 0.5 }} />
-                        {formatDateTime(event.start_time)}
-                      </Typography>
-                      {event.description && (
-                        <Typography variant="caption" display="block" noWrap>
-                          {event.description}
-                        </Typography>
-                      )}
-                    </Box>
-                  }
-                />
-              </ListItem>
-            )}
+            color="secondary"
+            columns={taskColumns}
+            renderRow={renderTaskRow}
           />
         </Grid>
       </Grid>

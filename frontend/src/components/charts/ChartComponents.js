@@ -1,406 +1,556 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
+  Box,
+  Card,
+  CardContent,
+  CardHeader,
+  Typography,
+  useTheme,
+  alpha,
+  LinearProgress,
+  Divider
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  ShowChart as ShowChartIcon
+} from '@mui/icons-material';
+import {
+  ResponsiveContainer,
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   Legend,
-  ArcElement,
-  TimeScale,
-} from 'chart.js';
-import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
-import 'chartjs-adapter-date-fns';
-import { Card } from 'react-bootstrap';
+  BarChart as RechartsBarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart as RechartsAreaChart,
+  Area
+} from 'recharts';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  TimeScale
-);
-
-// Common chart options
-const defaultOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top',
-    },
-    title: {
-      display: true,
-    },
-  },
-};
-
-// Line Chart Component
-export const LineChart = ({ 
-  data, 
-  title = 'Line Chart', 
-  height = 400, 
-  options = {} 
-}) => {
-  const chartOptions = {
-    ...defaultOptions,
-    plugins: {
-      ...defaultOptions.plugins,
-      title: {
-        ...defaultOptions.plugins.title,
-        text: title,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-    ...options,
-  };
-
-  return (
-    <Card>
-      <Card.Body>
-        <div style={{ height: `${height}px` }}>
-          <Line data={data} options={chartOptions} />
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Bar Chart Component
-export const BarChart = ({ 
-  data, 
-  title = 'Bar Chart', 
-  height = 400, 
-  options = {} 
-}) => {
-  const chartOptions = {
-    ...defaultOptions,
-    plugins: {
-      ...defaultOptions.plugins,
-      title: {
-        ...defaultOptions.plugins.title,
-        text: title,
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-      },
-    },
-    ...options,
-  };
-
-  return (
-    <Card>
-      <Card.Body>
-        <div style={{ height: `${height}px` }}>
-          <Bar data={data} options={chartOptions} />
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Pie Chart Component
-export const PieChart = ({ 
-  data, 
-  title = 'Pie Chart', 
-  height = 400, 
-  options = {} 
-}) => {
-  const chartOptions = {
-    ...defaultOptions,
-    plugins: {
-      ...defaultOptions.plugins,
-      title: {
-        ...defaultOptions.plugins.title,
-        text: title,
-      },
-    },
-    ...options,
-  };
-
-  return (
-    <Card>
-      <Card.Body>
-        <div style={{ height: `${height}px` }}>
-          <Pie data={data} options={chartOptions} />
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Doughnut Chart Component
-export const DoughnutChart = ({ 
-  data, 
-  title = 'Doughnut Chart', 
-  height = 400, 
-  options = {} 
-}) => {
-  const chartOptions = {
-    ...defaultOptions,
-    plugins: {
-      ...defaultOptions.plugins,
-      title: {
-        ...defaultOptions.plugins.title,
-        text: title,
-      },
-    },
-    ...options,
-  };
-
-  return (
-    <Card>
-      <Card.Body>
-        <div style={{ height: `${height}px` }}>
-          <Doughnut data={data} options={chartOptions} />
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Metric Card Component
+// Enhanced Metric Card with trend indicators
 export const MetricCard = ({ 
   title, 
   value, 
-  change, 
-  changeType = 'positive', 
-  subtitle,
-  icon 
+  subtitle, 
+  icon, 
+  color = 'primary',
+  trend,
+  trendValue,
+  trendDirection,
+  chart,
+  background = false
 }) => {
-  const getChangeColor = () => {
-    if (changeType === 'positive') return 'text-success';
-    if (changeType === 'negative') return 'text-danger';
-    return 'text-muted';
-  };
-
-  const getChangeIcon = () => {
-    if (changeType === 'positive') return '↗';
-    if (changeType === 'negative') return '↘';
-    return '→';
-  };
+  const theme = useTheme();
+  const TrendIcon = trendDirection === 'up' ? TrendingUpIcon : TrendingDownIcon;
+  const trendColor = trendDirection === 'up' ? theme.palette.success.main : theme.palette.error.main;
 
   return (
-    <Card className="h-100">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-center">
-          <div>
-            <h6 className="card-title text-muted mb-2">{title}</h6>
-            <h3 className="mb-0">{value}</h3>
-            {subtitle && <small className="text-muted">{subtitle}</small>}
-            {change !== undefined && (
-              <div className={`small ${getChangeColor()} mt-1`}>
-                {getChangeIcon()} {change}%
-              </div>
+    <Card 
+      elevation={0}
+      sx={{
+        height: '100%',
+        border: 1,
+        borderColor: 'divider',
+        background: background ? `linear-gradient(135deg, ${alpha(theme.palette[color].main, 0.1)} 0%, ${alpha(theme.palette[color].main, 0.05)} 100%)` : 'background.paper',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography 
+              variant="body2" 
+              color="text.secondary" 
+              sx={{ 
+                fontWeight: 500,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                mb: 1
+              }}
+            >
+              {title}
+            </Typography>
+            
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 'bold',
+                mb: 1,
+                color: color !== 'primary' ? `${color}.main` : 'text.primary'
+              }}
+            >
+              {value}
+            </Typography>
+
+            {trend && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                <TrendIcon sx={{ fontSize: 16, color: trendColor }} />
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: trendColor, 
+                    fontWeight: 'medium' 
+                  }}
+                >
+                  {trendValue}
+                </Typography>
+              </Box>
             )}
-          </div>
+
+            {subtitle && (
+              <Typography variant="caption" color="text.secondary">
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
+
           {icon && (
-            <div className="text-primary" style={{ fontSize: '2rem' }}>
-              {icon}
-            </div>
+            <Box
+              sx={{
+                bgcolor: `${color}.light`,
+                borderRadius: 2,
+                p: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {React.cloneElement(icon, { 
+                sx: { color: `${color}.main`, fontSize: 24 } 
+              })}
+            </Box>
           )}
-        </div>
-      </Card.Body>
+        </Box>
+
+        {chart && (
+          <Box sx={{ mt: 2, height: 60 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              {chart}
+            </ResponsiveContainer>
+          </Box>
+        )}
+      </CardContent>
     </Card>
   );
 };
 
-// Progress Bar Component
-export const ProgressBarChart = ({ 
+// Enhanced Line Chart Component
+export const LineChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  showGrid = true,
+  showLegend = true,
+  colors = ['#1976d2', '#dc004e'],
+  lines = [{ dataKey: 'value', name: 'Value' }]
+}) => {
+  const theme = useTheme();
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <RechartsLineChart data={data}>
+            {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />}
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: theme.shape.borderRadius,
+                boxShadow: theme.shadows[4]
+              }}
+            />
+            {showLegend && <Legend />}
+            {lines.map((line, index) => (
+              <Line
+                key={line.dataKey}
+                type="monotone"
+                dataKey={line.dataKey}
+                stroke={colors[index % colors.length]}
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
+                name={line.name}
+              />
+            ))}
+          </RechartsLineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Enhanced Bar Chart Component
+export const BarChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  showGrid = true,
+  showLegend = true,
+  colors = ['#1976d2', '#dc004e'],
+  bars = [{ dataKey: 'value', name: 'Value' }]
+}) => {
+  const theme = useTheme();
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <RechartsBarChart data={data}>
+            {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />}
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: theme.shape.borderRadius,
+                boxShadow: theme.shadows[4]
+              }}
+            />
+            {showLegend && <Legend />}
+            {bars.map((bar, index) => (
+              <Bar
+                key={bar.dataKey}
+                dataKey={bar.dataKey}
+                fill={colors[index % colors.length]}
+                radius={[4, 4, 0, 0]}
+                name={bar.name}
+              />
+            ))}
+          </RechartsBarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
+// New Donut Chart Component
+export const DonutChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  colors = ['#1976d2', '#dc004e', '#ed6c02', '#2e7d32', '#9c27b0'],
+  showLegend = true,
+  centerText,
+  centerValue
+}) => {
+  const theme = useTheme();
+
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    if (percent < 0.05) return null; // Don't show labels for very small slices
+
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight="bold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2, position: 'relative' }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={renderCustomizedLabel}
+              outerRadius={80}
+              innerRadius={40}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: theme.shape.borderRadius,
+                boxShadow: theme.shadows[4]
+              }}
+            />
+            {showLegend && <Legend />}
+          </PieChart>
+        </ResponsiveContainer>
+        
+        {/* Center text overlay */}
+        {(centerText || centerValue) && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              textAlign: 'center',
+              pointerEvents: 'none'
+            }}
+          >
+            {centerValue && (
+              <Typography variant="h5" sx={{ fontWeight: 'bold', lineHeight: 1 }}>
+                {centerValue}
+              </Typography>
+            )}
+            {centerText && (
+              <Typography variant="caption" color="text.secondary">
+                {centerText}
+              </Typography>
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// New Progress Chart Component
+export const ProgressChart = ({ 
   title, 
   value, 
-  max = 100, 
+  total, 
   color = 'primary',
-  height = 'auto' 
+  height = 8,
+  showPercentage = true,
+  subtitle
 }) => {
-  const percentage = (value / max) * 100;
+  const percentage = total > 0 ? (value / total) * 100 : 0;
 
   return (
-    <Card className="h-100">
-      <Card.Body>
-        <h6 className="card-title">{title}</h6>
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <span>{value}</span>
-          <span className="text-muted">/{max}</span>
-        </div>
-        <div className="progress" style={{ height: '10px' }}>
-          <div
-            className={`progress-bar bg-${color}`}
-            role="progressbar"
-            style={{ width: `${percentage}%` }}
-            aria-valuenow={value}
-            aria-valuemin="0"
-            aria-valuemax={max}
-          />
-        </div>
-        <div className="text-center mt-2">
-          <small className="text-muted">{percentage.toFixed(1)}%</small>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Data Table Component
-export const DataTable = ({ 
-  title, 
-  data = [], 
-  columns = [], 
-  height = 400 
-}) => {
-  return (
-    <Card>
-      <Card.Header>
-        <h6 className="mb-0">{title}</h6>
-      </Card.Header>
-      <Card.Body className="p-0">
-        <div 
-          style={{ 
-            height: `${height}px`, 
-            overflowY: 'auto' 
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            {title}
+          </Typography>
+          {showPercentage && (
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: `${color}.main` }}>
+              {percentage.toFixed(1)}%
+            </Typography>
+          )}
+        </Box>
+        
+        <LinearProgress
+          variant="determinate"
+          value={percentage}
+          color={color}
+          sx={{
+            height: height,
+            borderRadius: height / 2,
+            backgroundColor: alpha(color === 'primary' ? '#1976d2' : color, 0.1),
+            '& .MuiLinearProgress-bar': {
+              borderRadius: height / 2,
+            }
           }}
-        >
-          <table className="table table-striped table-hover mb-0">
-            <thead className="bg-light sticky-top">
-              <tr>
-                {columns.map((column, index) => (
-                  <th key={index} className="border-0">
-                    {column.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  {columns.map((column, colIndex) => (
-                    <td key={colIndex}>
-                      {column.render 
-                        ? column.render(row[column.key], row) 
-                        : row[column.key]
-                      }
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card.Body>
+        />
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            {value} of {total}
+          </Typography>
+          {subtitle && (
+            <Typography variant="body2" color="text.secondary">
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+      </CardContent>
     </Card>
   );
 };
 
-// Chart colors palette
-export const chartColors = {
-  primary: '#007bff',
-  secondary: '#6c757d',
-  success: '#28a745',
-  danger: '#dc3545',
-  warning: '#ffc107',
-  info: '#17a2b8',
-  light: '#f8f9fa',
-  dark: '#343a40',
-  purple: '#6f42c1',
-  pink: '#e83e8c',
-  indigo: '#6610f2',
-  teal: '#20c997',
-  orange: '#fd7e14',
+// New Area Chart Component
+export const AreaChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  color = '#1976d2',
+  showGrid = true,
+  gradient = true
+}) => {
+  const theme = useTheme();
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <RechartsAreaChart data={data}>
+            <defs>
+              {gradient && (
+                <linearGradient id={`color-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={color} stopOpacity={0.1}/>
+                </linearGradient>
+              )}
+            </defs>
+            {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />}
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: theme.shape.borderRadius,
+                boxShadow: theme.shadows[4]
+              }}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              strokeWidth={2}
+              fillOpacity={1}
+              fill={gradient ? `url(#color-${color.replace('#', '')})` : color}
+            />
+          </RechartsAreaChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
 };
 
-// Color palette for multiple series
-export const colorPalette = [
-  chartColors.primary,
-  chartColors.success,
-  chartColors.warning,
-  chartColors.danger,
-  chartColors.info,
-  chartColors.purple,
-  chartColors.pink,
-  chartColors.teal,
-  chartColors.orange,
-  chartColors.indigo,
-];
+// New Mini Chart Component for inline charts
+export const MiniChart = ({ 
+  data, 
+  type = 'line',
+  color = '#1976d2',
+  height = 40,
+  showTooltip = false
+}) => {
+  const ChartComponent = type === 'line' ? RechartsLineChart : RechartsBarChart;
+  const DataComponent = type === 'line' ? Line : Bar;
 
-// Utility functions for chart data formatting
-export const chartUtils = {
-  // Format data for line/bar charts
-  formatTimeSeriesData: (data, label = 'Value') => ({
-    labels: data.map(item => {
-      const date = new Date(item.period || item.date);
-      return date.toLocaleDateString();
-    }),
-    datasets: [{
-      label,
-      data: data.map(item => item.count || item.value || 0),
-      borderColor: chartColors.primary,
-      backgroundColor: chartColors.primary + '20',
-      tension: 0.1,
-    }]
-  }),
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ChartComponent data={data}>
+        {showTooltip && <Tooltip />}
+        <DataComponent
+          dataKey="value"
+          stroke={color}
+          fill={color}
+          strokeWidth={2}
+          dot={false}
+          radius={type === 'bar' ? [2, 2, 0, 0] : undefined}
+        />
+      </ChartComponent>
+    </ResponsiveContainer>
+  );
+};
 
-  // Format data for pie/doughnut charts
-  formatPieData: (data, labelKey = 'label', valueKey = 'value') => ({
-    labels: data.map(item => item[labelKey] || item.status || item.name),
-    datasets: [{
-      data: data.map(item => item[valueKey] || item.count || 0),
-      backgroundColor: colorPalette.slice(0, data.length),
-      borderWidth: 1,
-    }]
-  }),
+// Legacy Chart.js components (keeping for backward compatibility)
+export const LegacyLineChart = ({ data, options }) => {
+  console.warn('LegacyLineChart is deprecated. Please use the new LineChart component.');
+  return <LineChart data={data} {...options} />;
+};
 
-  // Format multi-series data
-  formatMultiSeriesData: (data, series) => ({
-    labels: data.map(item => {
-      const date = new Date(item.period || item.date);
-      return date.toLocaleDateString();
-    }),
-    datasets: series.map((serie, index) => ({
-      label: serie.label,
-      data: data.map(item => item[serie.key] || 0),
-      borderColor: colorPalette[index],
-      backgroundColor: colorPalette[index] + '20',
-      tension: 0.1,
-    }))
-  }),
+export const LegacyBarChart = ({ data, options }) => {
+  console.warn('LegacyBarChart is deprecated. Please use the new BarChart component.');
+  return <BarChart data={data} {...options} />;
+};
 
-  // Calculate percentage change
-  calculateChange: (current, previous) => {
-    if (!previous || previous === 0) return 0;
-    return ((current - previous) / previous * 100).toFixed(1);
-  },
-
-  // Format currency
-  formatCurrency: (value, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(value);
-  },
-
-  // Format numbers with K/M suffixes
-  formatLargeNumber: (value) => {
-    if (value >= 1000000) {
-      return (value / 1000000).toFixed(1) + 'M';
-    }
-    if (value >= 1000) {
-      return (value / 1000).toFixed(1) + 'K';
-    }
-    return value.toString();
-  },
+// Export all components
+export default {
+  MetricCard,
+  LineChart,
+  BarChart,
+  DonutChart,
+  ProgressChart,
+  AreaChart,
+  MiniChart,
+  // Legacy exports
+  LegacyLineChart,
+  LegacyBarChart
 }; 

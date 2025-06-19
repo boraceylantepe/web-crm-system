@@ -33,13 +33,15 @@ class UserSerializer(DynamicFieldsModelSerializer):
     
     password = serializers.CharField(write_only=True, required=False)
     role_display = serializers.CharField(source='get_role_display', read_only=True)
+    profile_picture_url = serializers.CharField(source='get_profile_picture_url', read_only=True)
     
     class Meta:
         model = User
         fields = ['id', 'email', 'username', 'first_name', 'last_name', 
                   'role', 'role_display', 'is_staff', 'is_active', 'password', 'date_joined', 
-                  'password_changed_at', 'force_password_change', 'session_timeout']
-        read_only_fields = ['id', 'date_joined', 'password_changed_at']
+                  'password_changed_at', 'force_password_change', 'session_timeout',
+                  'profile_picture', 'profile_picture_url']
+        read_only_fields = ['id', 'date_joined', 'password_changed_at', 'profile_picture_url']
         extra_kwargs = {
             'password': {'write_only': True},
             'is_staff': {'read_only': True, 'required': False},
@@ -230,4 +232,34 @@ class TaskSerializer(serializers.ModelSerializer):
     def get_assigned_to_name(self, obj):
         if obj.assigned_to:
             return f"{obj.assigned_to.first_name} {obj.assigned_to.last_name}".strip() or obj.assigned_to.email
-        return None 
+        return None
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """Serializer for user profile management (non-admin users)."""
+    
+    profile_picture_url = serializers.CharField(source='get_profile_picture_url', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'profile_picture', 'profile_picture_url']
+        read_only_fields = ['id', 'email', 'profile_picture_url']
+    
+    def update(self, instance, validated_data):
+        """Update user profile information."""
+        # Only allow updating personal information
+        allowed_fields = ['first_name', 'last_name', 'profile_picture']
+        
+        for field in allowed_fields:
+            if field in validated_data:
+                value = validated_data[field]
+                # Handle profile picture clearing
+                if field == 'profile_picture' and value is None:
+                    # Clear the profile picture
+                    if instance.profile_picture:
+                        instance.profile_picture.delete(save=False)
+                    instance.profile_picture = None
+                else:
+                    setattr(instance, field, value)
+        
+        instance.save()
+        return instance 
