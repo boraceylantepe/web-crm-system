@@ -31,6 +31,17 @@ This enterprise-grade CRM system empowers businesses to manage customer relation
 - 🔔 **Smart Notifications**: Real-time alerts and notification system
 - 🌐 **Scalable Architecture**: Modular design supporting horizontal scaling
 
+![{6B6CBDCD-BD4E-41BE-85C7-F9E8C381B9AF}](https://github.com/user-attachments/assets/a18258bd-c741-4c58-a68e-4616487950f1)
+![image](https://github.com/user-attachments/assets/16d280bc-cce5-4df1-b13b-49375fe39467)
+![{764A4F09-CFF8-45EA-9574-265130F765A0}](https://github.com/user-attachments/assets/3adccaf8-9430-45c8-8210-f4f82e113d8a)
+![{905A39D7-64FC-40AA-8A7E-0734412AD125}](https://github.com/user-attachments/assets/dec6a9ca-7362-4fcd-8786-bc72c92ef161)
+![{64767019-FA0B-4E32-BA2D-38FDB02D8A3F}](https://github.com/user-attachments/assets/fa758992-2b7a-43fe-996e-a633c5eca3f6)
+![{1E1C486F-CF4E-41B2-B878-38B27E617FD6}](https://github.com/user-attachments/assets/3d405942-5ad6-485d-9ab8-ce0b423412e1)
+
+
+
+
+
 ## ✨ Features
 
 ### 🔐 Authentication & User Management
