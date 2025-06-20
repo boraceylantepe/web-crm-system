@@ -50,7 +50,6 @@ class UserViewSet(viewsets.ModelViewSet):
             # Default permission
             permission_classes = [permissions.IsAuthenticated]
             
-        print(f"UserViewSet action: {self.action}, Permission classes: {permission_classes}")
         return [permission() for permission in permission_classes]
     
     def get_queryset(self):
@@ -120,33 +119,22 @@ class UserViewSet(viewsets.ModelViewSet):
         return user
 
     def update(self, request, *args, **kwargs):
-        """Override update to add debugging for permissions and handle manager permissions explicitly"""
-        print(f"Update request from user: {request.user.username}, Role: {request.user.role}")
-        print(f"Request data: {request.data}")
-        print(f"Target user ID: {kwargs.get('pk')}")
+        """Override update to handle manager permissions explicitly"""
         
         # Direct permission check for managers editing regular users
         if request.user.role == 'MANAGER':
             try:
-                print("Bypassing permission checks for manager...")
                 # Get the user being edited without going through DRF's get_object() to avoid permission checks
                 target_id = kwargs.get('pk')
                 if not target_id:
-                    print("No target ID provided")
                     return Response(
                         {"detail": "User ID not provided."},
                         status=status.HTTP_400_BAD_REQUEST
                     )
                 
-                print(f"Looking up User with ID: {target_id}")
-                # Use the User model that's already imported at the top
-                print(f"User model: {User}")
-                
                 try:
                     target_user = User.objects.get(pk=target_id)
-                    print(f"Target user found: {target_user.username}, Role: {target_user.role}")
                 except User.DoesNotExist:
-                    print(f"User with ID {target_id} not found")
                     return Response(
                         {"detail": "User not found."},
                         status=status.HTTP_404_NOT_FOUND
@@ -154,7 +142,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 
                 # Managers can edit basic info of regular users but not other managers or admins
                 if target_user.role in ['ADMIN', 'MANAGER']:
-                    print(f"Manager cannot edit admin/manager: {target_user.role}")
                     return Response(
                         {"detail": "You do not have permission to edit administrators or managers."},
                         status=status.HTTP_403_FORBIDDEN
@@ -163,7 +150,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 # Don't allow managers to change sensitive fields
                 sensitive_fields = ['role', 'is_staff', 'is_superuser', 'is_active']
                 if any(field in request.data for field in sensitive_fields):
-                    print(f"Manager tried to edit sensitive fields: {[f for f in sensitive_fields if f in request.data]}")
                     return Response(
                         {"detail": "You do not have permission to edit these fields."},
                         status=status.HTTP_403_FORBIDDEN
@@ -173,14 +159,11 @@ class UserViewSet(viewsets.ModelViewSet):
                 serializer = self.get_serializer(target_user, data=request.data, partial=kwargs.get('partial', False))
                 if serializer.is_valid():
                     serializer.save()
-                    print("Manager update successful")
                     return Response(serializer.data)
                 else:
-                    print(f"Serializer validation failed: {serializer.errors}")
                     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
                 
             except Exception as e:
-                print(f"Error in manager permission check: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 return Response(
@@ -192,7 +175,6 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             return super().update(request, *args, **kwargs)
         except Exception as e:
-            print(f"Error in regular update method: {str(e)}")
             import traceback
             traceback.print_exc()
             return Response(

@@ -75,7 +75,10 @@ export const deleteCustomer = async (id) => {
 // Search customers with advanced filters
 export const searchCustomers = async (params = {}) => {
   try {
-    const response = await axios.get(`${API_URL}/api/customers/search_advanced/`, { params });
+    const response = await axios.get(`${API_URL}/api/customers/search_advanced/`, {
+      ...getAuthHeaders(),
+      params
+    });
     return response.data;
   } catch (error) {
     console.error('Error searching customers:', error);

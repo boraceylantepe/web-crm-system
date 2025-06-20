@@ -168,8 +168,16 @@ class GeneratedReportViewSet(viewsets.ModelViewSet):
         if report.status != 'completed':
             return Response({'error': 'Report is not completed'}, status=status.HTTP_400_BAD_REQUEST)
         
-        filename = f"{report.template.name}_{report.created_at.strftime('%Y%m%d_%H%M%S')}.csv"
-        return ReportExporter.export_to_csv(report.data_dict, filename)
+        # Create a clean filename
+        safe_template_name = "".join(c for c in report.template.name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        filename = f"{safe_template_name}_{report.created_at.strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        return ReportExporter.export_to_csv(
+            report_data=report.data_dict,
+            filename=filename,
+            report_name=report.template.name,
+            report_type=report.template.report_type
+        )
 
     @action(detail=True, methods=['post'])
     def share(self, request, pk=None):
@@ -201,21 +209,40 @@ class AnalyticsViewSet(viewsets.ViewSet):
     ViewSet for analytics data endpoints with enhanced caching.
     """
     permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def auth_test(self, request):
+        """Test endpoint to check authentication status."""
+        return Response({
+            'authenticated': request.user.is_authenticated,
+            'user': str(request.user),
+            'user_id': request.user.id if request.user.is_authenticated else None,
+            'headers': dict(request.headers),
+            'method': request.method
+        })
 
     @action(detail=False, methods=['get'])
     def dashboard_kpis(self, request):
         """Get KPI data for dashboard widgets with caching."""
         try:
-            # Check cache first
-            cache_key = CacheManager.get_cache_key(
-                request.user.id, 
-                'dashboard_kpis', 
-                {}
-            )
-            cached_data = CacheManager.get_cached_analytics_data(cache_key)
+            # Check if cache-busting parameter is present
+            cache_bust = request.query_params.get('_t')
             
-            if cached_data:
-                return Response(cached_data)
+            cache_key = None
+            cached_data = None
+            
+            # Only use cache if no cache-busting parameter
+            if not cache_bust:
+                # Check cache first
+                cache_key = CacheManager.get_cache_key(
+                    request.user.id, 
+                    'dashboard_kpis', 
+                    {}
+                )
+                cached_data = CacheManager.get_cached_analytics_data(cache_key)
+                
+                if cached_data:
+                    return Response(cached_data)
             
             # Generate fresh data
             kpis = AnalyticsService.get_dashboard_kpis(request.user)
@@ -226,8 +253,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
                 'generated_at': timezone.now()
             }
             
-            # Cache the result for 5 minutes
-            CacheManager.cache_analytics_data(cache_key, response_data, 300)
+            # Cache the result for 5 minutes (only if no cache-busting)
+            if not cache_bust and cache_key:
+                CacheManager.cache_analytics_data(cache_key, response_data, 300)
             
             return Response(response_data)
         except Exception as e:
@@ -286,18 +314,31 @@ class AnalyticsViewSet(viewsets.ViewSet):
         date_range = self._parse_date_range(request.query_params)
         grouping = request.query_params.get('grouping', 'month')
         
-        cache_key = CacheManager.get_cache_key(
-            request.user.id,
-            'customer_engagement',
-            {'date_range': date_range, 'grouping': grouping}
-        )
-        cached_data = CacheManager.get_cached_analytics_data(cache_key)
+        # Check for cache-busting parameters
+        cache_bust = request.query_params.get('_t') or request.query_params.get('_cacheBust')
         
-        if cached_data:
-            return Response(cached_data)
+        # Only use cache if no cache-busting parameter is present
+        if not cache_bust:
+            cache_key = CacheManager.get_cache_key(
+                request.user.id,
+                'customer_engagement',
+                {'date_range': date_range, 'grouping': grouping}
+            )
+            cached_data = CacheManager.get_cached_analytics_data(cache_key)
+            
+            if cached_data:
+                return Response(cached_data)
         
         data = AnalyticsService.get_customer_engagement_data(request.user, date_range, grouping)
-        CacheManager.cache_analytics_data(cache_key, data, 600)
+        
+        # Cache for 10 minutes (only if no cache-busting)
+        if not cache_bust:
+            cache_key = CacheManager.get_cache_key(
+                request.user.id,
+                'customer_engagement',
+                {'date_range': date_range, 'grouping': grouping}
+            )
+            CacheManager.cache_analytics_data(cache_key, data, 600)
         
         return Response(data)
 
@@ -308,24 +349,29 @@ class AnalyticsViewSet(viewsets.ViewSet):
         grouping = request.query_params.get('grouping', 'month')
         user_id = request.query_params.get('user_id')
         
+        # Check for cache-busting parameters
+        cache_bust = request.query_params.get('_t') or request.query_params.get('_cacheBust')
+        
         # For regular users, they can only see their own data
         if user_id and not request.user.is_staff:
             if str(request.user.id) != str(user_id):
                 return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        cache_params = {'date_range': date_range, 'grouping': grouping}
-        if user_id:
-            cache_params['user_id'] = user_id
+        # Only use cache if no cache-busting parameter is present
+        if not cache_bust:
+            cache_params = {'date_range': date_range, 'grouping': grouping}
+            if user_id:
+                cache_params['user_id'] = user_id
+                
+            cache_key = CacheManager.get_cache_key(
+                request.user.id,
+                'task_completion',
+                cache_params
+            )
+            cached_data = CacheManager.get_cached_analytics_data(cache_key)
             
-        cache_key = CacheManager.get_cache_key(
-            request.user.id,
-            'task_completion',
-            cache_params
-        )
-        cached_data = CacheManager.get_cached_analytics_data(cache_key)
-        
-        if cached_data:
-            return Response(cached_data)
+            if cached_data:
+                return Response(cached_data)
         
         target_user = None
         if user_id:
@@ -340,7 +386,19 @@ class AnalyticsViewSet(viewsets.ViewSet):
             grouping, 
             target_user=target_user
         )
-        CacheManager.cache_analytics_data(cache_key, data, 600)
+        
+        # Cache for 10 minutes (only if no cache-busting)
+        if not cache_bust:
+            cache_params = {'date_range': date_range, 'grouping': grouping}
+            if user_id:
+                cache_params['user_id'] = user_id
+                
+            cache_key = CacheManager.get_cache_key(
+                request.user.id,
+                'task_completion',
+                cache_params
+            )
+            CacheManager.cache_analytics_data(cache_key, data, 600)
         
         return Response(data)
 
@@ -384,6 +442,48 @@ class AnalyticsViewSet(viewsets.ViewSet):
             return Response(cached_data)
         
         data = AnalyticsService.get_user_activity_data(date_range, grouping)
+        CacheManager.cache_analytics_data(cache_key, data, 900)  # Cache for 15 minutes
+        
+        return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def user_sales_performance(self, request):
+        """Get sales performance data for all users (manager/admin only)."""
+        if not request.user.role in ['ADMIN', 'MANAGER']:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        cache_key = CacheManager.get_cache_key(
+            'all_users',
+            'user_sales_performance',
+            {}
+        )
+        cached_data = CacheManager.get_cached_analytics_data(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        data = AnalyticsService.get_user_sales_performance()
+        CacheManager.cache_analytics_data(cache_key, data, 900)  # Cache for 15 minutes
+        
+        return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def user_task_performance(self, request):
+        """Get task performance data for all users (manager/admin only)."""
+        if not request.user.role in ['ADMIN', 'MANAGER']:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        cache_key = CacheManager.get_cache_key(
+            'all_users',
+            'user_task_performance',
+            {}
+        )
+        cached_data = CacheManager.get_cached_analytics_data(cache_key)
+        
+        if cached_data:
+            return Response(cached_data)
+        
+        data = AnalyticsService.get_user_task_performance()
         CacheManager.cache_analytics_data(cache_key, data, 900)  # Cache for 15 minutes
         
         return Response(data)

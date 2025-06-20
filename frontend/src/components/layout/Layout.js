@@ -18,7 +18,6 @@ import {
   Menu,
   MenuItem,
   TextField,
-  InputAdornment,
   Switch,
   FormControlLabel,
   Collapse,
@@ -37,13 +36,12 @@ import {
   ManageAccounts as UserManagementIcon,
   Assessment as AnalyticsIcon,
   Description as ReportsIcon,
-  Search as SearchIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
   ExpandLess,
   ExpandMore,
   Settings as SettingsIcon,
-  Notifications as NotificationsIcon,
+  Business as BusinessIcon,
   AccountBox as ProfileIcon,
   Logout as LogoutIcon,
   Translate as TranslateIcon,
@@ -51,12 +49,14 @@ import {
 import { AuthContext } from '../../context/AuthContext';
 import PasswordChange from '../auth/PasswordChange';
 import NotificationMenu from '../notifications/NotificationMenu';
+import { useTheme } from '../../context/ThemeContext';
+
 
 const drawerWidth = 280; // Increased drawer width for better spacing
 
 // Main navigation items
 const mainMenuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/', section: 'main', badge: 5 },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/', section: 'main' },
 ];
 
 // Apps section items
@@ -65,7 +65,6 @@ const appsMenuItems = [
   { text: 'Sales', icon: <SalesIcon />, path: '/sales', section: 'apps' },
   { text: 'Tasks', icon: <TaskIcon />, path: '/tasks', section: 'apps' },
   { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar', section: 'apps' },
-  { text: 'Notifications', icon: <NotificationsIcon />, path: '/notifications', section: 'apps', badge: 3 },
 ];
 
 // Analytics & Reports section
@@ -84,8 +83,6 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [darkMode, setDarkMode] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     main: true,
     apps: true,
@@ -94,6 +91,7 @@ const Layout = () => {
   });
   
   const { user, logout, passwordChangeRequired, isAdminOrManager } = useContext(AuthContext);
+  const { isDarkMode, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -236,15 +234,15 @@ const Layout = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
           <Avatar
             sx={{
-              bgcolor: 'primary.main',
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               mr: 2,
-              fontSize: '1rem',
-              fontWeight: 'bold'
+              bgcolor: 'primary.main',
+              border: `2px solid`,
+              borderColor: 'primary.light'
             }}
           >
-            C
+            <BusinessIcon sx={{ fontSize: 24, color: 'primary.contrastText' }} />
           </Avatar>
           <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
             CRM System
@@ -349,30 +347,7 @@ const Layout = () => {
             {sidebarOpen ? <MenuOpenIcon /> : <MenuIcon />}
           </IconButton>
 
-          {/* Search bar */}
-          <TextField
-            size="small"
-            placeholder="Search here..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              width: { xs: 200, md: 300 },
-              mr: 2,
-              '& .MuiOutlinedInput-root': {
-                bgcolor: 'background.default',
-                '&:hover': {
-                  bgcolor: 'background.default',
-                },
-              }
-            }}
-          />
+
 
           <Box sx={{ flexGrow: 1 }} />
           
@@ -382,10 +357,10 @@ const Layout = () => {
             {/* Theme toggle */}
             <IconButton
               color="inherit"
-              onClick={() => setDarkMode(!darkMode)}
-              title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              onClick={toggleTheme}
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+              {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
 
             {/* Calendar shortcut */}

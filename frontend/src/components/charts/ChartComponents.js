@@ -8,7 +8,14 @@ import {
   useTheme,
   alpha,
   LinearProgress,
-  Divider
+  Divider,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -30,8 +37,10 @@ import {
   Pie,
   Cell,
   AreaChart as RechartsAreaChart,
-  Area
+  Area,
+  ComposedChart
 } from 'recharts';
+import { Skeleton } from '@mui/material';
 
 // Enhanced Metric Card with trend indicators
 export const MetricCard = ({ 
@@ -272,6 +281,137 @@ export const BarChart = ({
   );
 };
 
+// Combination Chart Component (Bar + Line with dual Y-axis)
+export const ComboChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  showGrid = true,
+  showLegend = true,
+  barDataKey = 'revenue',
+  lineDataKey = 'deals',
+  barName = 'Revenue',
+  lineName = 'Deals',
+  barColor = '#1976d2',
+  lineColor = '#dc004e',
+  formatBar = (value) => `$${(value / 1000).toFixed(0)}K`,
+  formatLine = (value) => value,
+  leftAxisLabel,
+  rightAxisLabel
+}) => {
+  const theme = useTheme();
+
+  // Custom tooltip to format both values properly
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <Box
+          sx={{
+            backgroundColor: theme.palette.background.paper,
+            border: `1px solid ${theme.palette.divider}`,
+            borderRadius: theme.shape.borderRadius,
+            boxShadow: theme.shadows[4],
+            p: 1.5,
+            minWidth: 150
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+            {label}
+          </Typography>
+          {payload.map((entry, index) => (
+            <Typography
+              key={index}
+              variant="body2"
+              sx={{ 
+                color: entry.color,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>{entry.name}:</span>
+              <span style={{ marginLeft: 8, fontWeight: 'bold' }}>
+                {entry.dataKey === barDataKey ? formatBar(entry.value) : formatLine(entry.value)}
+              </span>
+            </Typography>
+          ))}
+        </Box>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart data={data}>
+            {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />}
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            {/* Left Y-Axis for Bars (Revenue) */}
+            <YAxis 
+              yAxisId="left"
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={formatBar}
+              label={leftAxisLabel ? { value: leftAxisLabel, angle: -90, position: 'insideLeft' } : undefined}
+            />
+            {/* Right Y-Axis for Line (Deals) */}
+            <YAxis 
+              yAxisId="right"
+              orientation="right"
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={formatLine}
+              label={rightAxisLabel ? { value: rightAxisLabel, angle: 90, position: 'insideRight' } : undefined}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {showLegend && <Legend />}
+            
+            {/* Bar for Revenue */}
+            <Bar
+              yAxisId="left"
+              dataKey={barDataKey}
+              fill={barColor}
+              radius={[4, 4, 0, 0]}
+              name={barName}
+            />
+            
+            {/* Line for Deals */}
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey={lineDataKey}
+              stroke={lineColor}
+              strokeWidth={3}
+              dot={{ r: 5, fill: lineColor }}
+              activeDot={{ r: 7 }}
+              name={lineName}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
 // New Donut Chart Component
 export const DonutChart = ({ 
   data, 
@@ -502,6 +642,85 @@ export const AreaChart = ({
   );
 };
 
+// Multi-Series Area Chart Component for Task Completion Trends
+export const MultiAreaChart = ({ 
+  data, 
+  title, 
+  height = 300,
+  showGrid = true,
+  showLegend = true,
+  series = [
+    { dataKey: 'completed', name: 'Completed', color: '#2e7d32' },
+    { dataKey: 'in_progress', name: 'In Progress', color: '#ed6c02' },
+    { dataKey: 'pending', name: 'Pending', color: '#1976d2' },
+    { dataKey: 'overdue', name: 'Overdue', color: '#d32f2f' }
+  ]
+}) => {
+  const theme = useTheme();
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      {title && (
+        <CardHeader
+          title={
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              {title}
+            </Typography>
+          }
+        />
+      )}
+      <Divider />
+      <CardContent sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={height}>
+          <RechartsAreaChart data={data}>
+            <defs>
+              {series.map((s) => (
+                <linearGradient key={s.dataKey} id={`color-${s.dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={s.color} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={s.color} stopOpacity={0.1}/>
+                </linearGradient>
+              ))}
+            </defs>
+            {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />}
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: theme.palette.background.paper,
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: theme.shape.borderRadius,
+                boxShadow: theme.shadows[4]
+              }}
+            />
+            {series.map((s) => (
+              <Area
+                key={s.dataKey}
+                type="monotone"
+                dataKey={s.dataKey}
+                stackId="1"
+                stroke={s.color}
+                strokeWidth={2}
+                fillOpacity={1}
+                fill={`url(#color-${s.dataKey})`}
+              />
+            ))}
+            {showLegend && <Legend />}
+          </RechartsAreaChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
 // New Mini Chart Component for inline charts
 export const MiniChart = ({ 
   data, 
@@ -537,8 +756,207 @@ export const LegacyLineChart = ({ data, options }) => {
 };
 
 export const LegacyBarChart = ({ data, options }) => {
-  console.warn('LegacyBarChart is deprecated. Please use the new BarChart component.');
-  return <BarChart data={data} {...options} />;
+  return <div>Legacy Bar Chart - Use new BarChart component instead</div>;
+};
+
+// User Performance Tables Components
+export const UserSalesTable = ({ data, loading, title = "Sales Performance by User" }) => {
+  const theme = useTheme();
+
+  console.log('UserSalesTable - data:', data, 'loading:', loading);
+
+  if (loading) {
+    return (
+      <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+        <CardHeader title={<Skeleton variant="text" width="40%" />} />
+        <Divider />
+        <CardContent>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} variant="rectangular" height={48} sx={{ mb: 1 }} />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+  };
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      <CardHeader
+        title={
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            {title}
+          </Typography>
+        }
+      />
+      <Divider />
+      <CardContent sx={{ p: 0 }}>
+        <TableContainer sx={{ maxHeight: 400 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>User</strong></TableCell>
+                <TableCell align="right"><strong>Total Sales</strong></TableCell>
+                <TableCell align="right"><strong>Revenue</strong></TableCell>
+                <TableCell align="right"><strong>Won Deals</strong></TableCell>
+                <TableCell align="right"><strong>Win Rate</strong></TableCell>
+                <TableCell align="right"><strong>Avg Deal Size</strong></TableCell>
+                <TableCell align="right"><strong>Pipeline</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data?.users?.map((user) => (
+                <TableRow key={user.user_id} hover>
+                  <TableCell>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                        {user.full_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {user.email}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell align="right">{user.total_sales}</TableCell>
+                  <TableCell align="right">{formatCurrency(user.total_amount)}</TableCell>
+                  <TableCell align="right">{user.won_sales}</TableCell>
+                  <TableCell align="right">
+                    <Chip
+                      label={`${user.win_rate}%`}
+                      size="small"
+                      color={user.win_rate >= 50 ? 'success' : user.win_rate >= 25 ? 'warning' : 'error'}
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell align="right">{formatCurrency(user.avg_deal_size)}</TableCell>
+                  <TableCell align="right">{user.pipeline_sales}</TableCell>
+                </TableRow>
+              ))}
+              {(!data?.users || data.users.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                      No user sales data available
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
+export const UserTasksTable = ({ data, loading, title = "Task Performance by User" }) => {
+  const theme = useTheme();
+
+  console.log('UserTasksTable - data:', data, 'loading:', loading);
+
+  if (loading) {
+    return (
+      <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+        <CardHeader title={<Skeleton variant="text" width="40%" />} />
+        <Divider />
+        <CardContent>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} variant="rectangular" height={48} sx={{ mb: 1 }} />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card elevation={0} sx={{ border: 1, borderColor: 'divider', height: '100%' }}>
+      <CardHeader
+        title={
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            {title}
+          </Typography>
+        }
+      />
+      <Divider />
+      <CardContent sx={{ p: 0 }}>
+        <TableContainer sx={{ maxHeight: 400 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>User</strong></TableCell>
+                <TableCell align="right"><strong>Total Tasks</strong></TableCell>
+                <TableCell align="right"><strong>Completed</strong></TableCell>
+                <TableCell align="right"><strong>Pending</strong></TableCell>
+                <TableCell align="right"><strong>In Progress</strong></TableCell>
+                <TableCell align="right"><strong>Overdue</strong></TableCell>
+                <TableCell align="right"><strong>Completion Rate</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data?.users?.map((user) => (
+                <TableRow key={user.user_id} hover>
+                  <TableCell>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                        {user.full_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {user.email}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell align="right">{user.total_tasks}</TableCell>
+                  <TableCell align="right">
+                    <Chip
+                      label={user.completed_tasks}
+                      size="small"
+                      color="success"
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell align="right">{user.pending_tasks}</TableCell>
+                  <TableCell align="right">{user.in_progress_tasks}</TableCell>
+                  <TableCell align="right">
+                    <Chip
+                      label={user.overdue_tasks}
+                      size="small"
+                      color={user.overdue_tasks > 0 ? 'error' : 'default'}
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Chip
+                      label={`${user.completion_rate}%`}
+                      size="small"
+                      color={user.completion_rate >= 80 ? 'success' : user.completion_rate >= 60 ? 'warning' : 'error'}
+                      variant="outlined"
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(!data?.users || data.users.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                      No user task data available
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CardContent>
+    </Card>
+  );
 };
 
 // Export all components
@@ -552,5 +970,9 @@ export default {
   MiniChart,
   // Legacy exports
   LegacyLineChart,
-  LegacyBarChart
+  LegacyBarChart,
+  ComboChart,
+  MultiAreaChart,
+  UserSalesTable,
+  UserTasksTable
 }; 

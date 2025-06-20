@@ -201,21 +201,23 @@ const calendarStyles = {
     },
     // Custom event types
     '& .calendar-event-task': {
-      borderLeft: '4px solid #f57c00',
-      backgroundColor: 'rgba(245, 124, 0, 0.15)',
-      color: '#774600',
       cursor: 'pointer',
+      fontWeight: '500',
+      // Use dynamic colors from backend - don't override backgroundColor
       '&:hover': {
-        backgroundColor: 'rgba(245, 124, 0, 0.25)'
+        opacity: '0.8',
+        transform: 'translateY(-1px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
       }
     },
     '& .calendar-event-sale': {
-      borderLeft: '4px solid #1976d2',
-      backgroundColor: 'rgba(25, 118, 210, 0.15)',
-      color: '#0d47a1',
       cursor: 'pointer',
+      fontWeight: '500',
+      // Use dynamic colors from backend - don't override backgroundColor
       '&:hover': {
-        backgroundColor: 'rgba(25, 118, 210, 0.25)'
+        opacity: '0.8',
+        transform: 'translateY(-1px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
       }
     },
     // Event draggable styles

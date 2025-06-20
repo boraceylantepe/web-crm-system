@@ -453,82 +453,385 @@ const Dashboard = () => {
     return ((current - previous) / previous * 100).toFixed(2);
   };
 
-  const customerColumns = [
-    { id: 'customer', label: 'Customer' },
-    { id: 'email', label: 'Email' },
-    { id: 'phone', label: 'Phone' },
-    { id: 'created_at', label: 'Created Date' },
-    { id: 'status', label: 'Status' },
-  ];
 
-  const renderCustomerRow = (customer, index) => (
-    <>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: '0.875rem' }}>
-            {customer.name?.charAt(0) || customer.first_name?.charAt(0) || 'U'}
-          </Avatar>
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-              {customer.name || `${customer.first_name} ${customer.last_name}`}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Customer ID #{customer.id}
-            </Typography>
-          </Box>
-        </Box>
-      </TableCell>
-      <TableCell>{customer.email}</TableCell>
-      <TableCell>{customer.phone || 'N/A'}</TableCell>
-      <TableCell>{formatDate(customer.created_at)}</TableCell>
-      <TableCell>
-        <Chip 
-          label={customer.is_active ? 'Active' : 'Inactive'} 
-          color={customer.is_active ? 'success' : 'default'}
-          size="small"
-        />
-      </TableCell>
-    </>
-  );
 
-  const taskColumns = [
-    { id: 'task', label: 'Task' },
-    { id: 'assigned_to', label: 'Assigned To' },
-    { id: 'due_date', label: 'Due Date' },
-    { id: 'priority', label: 'Priority' },
-    { id: 'status', label: 'Status' },
-  ];
+  // Revenue Analytics Component
+  const RevenueAnalyticsCard = () => {
+    const [revenueData, setRevenueData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [timeRange, setTimeRange] = useState('6months');
 
-  const renderTaskRow = (task, index) => (
-    <>
-      <TableCell>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-            #{task.id}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {task.title}
-          </Typography>
-        </Box>
-      </TableCell>
-      <TableCell>{task.assigned_to_name || 'Unassigned'}</TableCell>
-      <TableCell>{task.due_date ? formatDate(task.due_date) : 'No due date'}</TableCell>
-      <TableCell>
-        <Chip 
-          label={getPriorityDisplay(task.priority)} 
-          color={getPriorityColor(task.priority)}
-          size="small"
+         useEffect(() => {
+       const generateRevenueData = () => {
+         console.log('=== Revenue Analytics Debug ===');
+         console.log('All sales data:', dashboardData.recentSales);
+         console.log('Won sales:', dashboardData.recentSales.filter(sale => sale.status === 'WON'));
+         
+         const months = [];
+         const currentDate = new Date();
+         const monthsToShow = timeRange === '6months' ? 6 : timeRange === '12months' ? 12 : 3;
+         
+         for (let i = monthsToShow - 1; i >= 0; i--) {
+           const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+           const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+           
+           // Debug: Check different date fields and status values
+           const wonSales = dashboardData.recentSales.filter(sale => {
+             console.log(`Sale ${sale.id}:`, {
+               status: sale.status,
+               amount: sale.amount,
+               updated_at: sale.updated_at,
+               created_at: sale.created_at,
+               expected_close_date: sale.expected_close_date
+             });
+             return sale.status === 'WON';
+           });
+           
+           console.log(`Won sales for filtering:`, wonSales);
+           
+           // Calculate revenue from won sales for this month
+           // Try multiple date fields and be more flexible with status
+           const monthRevenue = dashboardData.recentSales
+             .filter(sale => {
+               // More flexible status checking
+               const isWon = sale.status === 'WON' || sale.status === 'won' || sale.status === 'Won';
+               if (!isWon) return false;
+               
+               // Function to parse DD/MM/YYYY HH:MM format
+               const parseDateString = (dateStr) => {
+                 if (!dateStr) return null;
+                 
+                 // Handle YYYY-MM-DD format (expected_close_date)
+                 if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                   return new Date(dateStr);
+                 }
+                 
+                 // Handle DD/MM/YYYY HH:MM format (created_at, updated_at)
+                 const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+                 if (match) {
+                   const [, day, month, year] = match;
+                   // JavaScript Date constructor expects MM/DD/YYYY, so we convert
+                   return new Date(`${month}/${day}/${year}`);
+                 }
+                 
+                 // Fallback to standard parsing
+                 return new Date(dateStr);
+               };
+               
+               // Try multiple date fields with proper parsing
+               let saleDate = null;
+               if (sale.expected_close_date) {
+                 saleDate = parseDateString(sale.expected_close_date);
+               } else if (sale.updated_at) {
+                 saleDate = parseDateString(sale.updated_at);
+               } else if (sale.created_at) {
+                 saleDate = parseDateString(sale.created_at);
+               }
+               
+               if (!saleDate || isNaN(saleDate.getTime())) {
+                 console.log(`Invalid date for sale ${sale.id}:`, {
+                   expected_close_date: sale.expected_close_date,
+                   updated_at: sale.updated_at,
+                   created_at: sale.created_at
+                 });
+                 return false;
+               }
+               
+               const matches = saleDate.getMonth() === date.getMonth() && 
+                      saleDate.getFullYear() === date.getFullYear();
+               
+               console.log(`Sale ${sale.id} date check:`, {
+                 rawDate: sale.expected_close_date || sale.updated_at || sale.created_at,
+                 parsedDate: saleDate.toISOString(),
+                 targetMonth: date.getMonth(),
+                 targetYear: date.getFullYear(),
+                 saleMonth: saleDate.getMonth(),
+                 saleYear: saleDate.getFullYear(),
+                 monthNames: {
+                   target: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+                   sale: saleDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                 },
+                 matches
+               });
+               
+               return matches;
+             })
+             .reduce((sum, sale) => {
+               const amount = parseFloat(sale.amount) || 0;
+               console.log(`Adding sale ${sale.id} amount:`, amount);
+               return sum + amount;
+             }, 0);
+           
+           console.log(`${monthName} total revenue:`, monthRevenue);
+           
+           months.push({
+             month: monthName,
+             revenue: monthRevenue,
+             target: monthRevenue * 1.2, // Simple target calculation
+           });
+         }
+         
+         console.log('Final revenue data:', months);
+         setRevenueData(months);
+         setLoading(false);
+       };
+
+       if (!dashboardData.loading) {
+         generateRevenueData();
+       }
+     }, [dashboardData, timeRange]);
+
+    const totalRevenue = revenueData.reduce((sum, month) => sum + month.revenue, 0);
+    const avgMonthlyRevenue = totalRevenue / (revenueData.length || 1);
+
+    return (
+      <Card elevation={0} sx={{ height: '100%', border: 1, borderColor: 'divider' }}>
+        <CardHeader
+          title={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TrendingUpIcon sx={{ color: 'success.main' }} />
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                Revenue Analytics
+              </Typography>
+            </Box>
+          }
+          action={
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="3months">Last 3 Months</MenuItem>
+                <MenuItem value="6months">Last 6 Months</MenuItem>
+                <MenuItem value="12months">Last 12 Months</MenuItem>
+              </Select>
+            </FormControl>
+          }
         />
-      </TableCell>
-      <TableCell>
-        <Chip 
-          label={getStatusDisplay(task.status)} 
-          color={getStatusColor(task.status)}
-          size="small"
+        <CardContent>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Box>
+              {/* Summary Stats */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.lighter', borderRadius: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                      {formatCurrency(totalRevenue)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Total Revenue
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'primary.lighter', borderRadius: 1 }}>
+                    <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      {formatCurrency(avgMonthlyRevenue)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Avg Monthly
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+                             {/* Simple Bar Chart */}
+               <Box sx={{ height: 200, display: 'flex', alignItems: 'end', gap: 1, px: 1 }}>
+                 {revenueData.length > 0 ? revenueData.map((month, index) => {
+                   const maxRevenue = Math.max(...revenueData.map(m => m.revenue));
+                   const height = maxRevenue > 0 ? Math.max((month.revenue / maxRevenue) * 150, 8) : 8;
+                   
+                   return (
+                     <Box key={index} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                       <Tooltip title={`${month.month}: ${formatCurrency(month.revenue)}`}>
+                         <Box
+                           sx={{
+                             width: '100%',
+                             height: `${height}px`,
+                             bgcolor: month.revenue > 0 ? 'primary.main' : 'grey.300',
+                             borderRadius: '4px 4px 0 0',
+                             transition: 'all 0.3s ease',
+                             cursor: 'pointer',
+                             '&:hover': {
+                               bgcolor: month.revenue > 0 ? 'primary.dark' : 'grey.400',
+                               transform: 'translateY(-2px)',
+                             }
+                           }}
+                         />
+                       </Tooltip>
+                       <Typography variant="caption" sx={{ mt: 1, textAlign: 'center', fontSize: '0.7rem' }}>
+                         {month.month.split(' ')[0]}
+                       </Typography>
+                     </Box>
+                   );
+                 }) : (
+                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                     <Typography color="text.secondary">No data available</Typography>
+                   </Box>
+                 )}
+               </Box>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Top Sales Opportunities Component
+  const TopSalesOpportunitiesCard = () => {
+    const topOpportunities = dashboardData.recentSales
+      .filter(sale => sale.status && !['WON', 'LOST'].includes(sale.status))
+      .sort((a, b) => (parseFloat(b.amount) || 0) - (parseFloat(a.amount) || 0))
+      .slice(0, 5);
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'NEW': return 'info';
+        case 'CONTACTED': return 'primary';
+        case 'PROPOSAL': return 'warning';
+        case 'NEGOTIATION': return 'secondary';
+        default: return 'default';
+      }
+    };
+
+    const getStatusDisplay = (status) => {
+      switch (status) {
+        case 'NEW': return 'New';
+        case 'CONTACTED': return 'Contacted';
+        case 'PROPOSAL': return 'Proposal';
+        case 'NEGOTIATION': return 'Negotiation';
+        default: return status;
+      }
+    };
+
+    return (
+      <Card elevation={0} sx={{ height: '100%', border: 1, borderColor: 'divider' }}>
+        <CardHeader
+          title={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SalesIcon sx={{ color: 'success.main' }} />
+              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                Top Sales Opportunities
+              </Typography>
+            </Box>
+          }
+          action={
+            <Button
+              component={Link}
+              to="/sales"
+              size="small"
+              endIcon={<ArrowForwardIcon />}
+              sx={{ textTransform: 'none' }}
+            >
+              View All
+            </Button>
+          }
         />
-      </TableCell>
-    </>
-  );
+        <CardContent sx={{ pt: 0 }}>
+          {dashboardData.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : topOpportunities.length > 0 ? (
+            <List sx={{ p: 0 }}>
+              {topOpportunities.map((sale, index) => (
+                <ListItem
+                  key={sale.id}
+                  sx={{
+                    px: 0,
+                    py: 1.5,
+                    borderBottom: index < topOpportunities.length - 1 ? 1 : 0,
+                    borderColor: 'divider',
+                    cursor: 'pointer',
+                    borderRadius: 1,
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                    }
+                  }}
+                  onClick={() => navigate(`/sales/${sale.id}`)}
+                >
+                  <Box sx={{ width: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                          {sale.title || 'Untitled Opportunity'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          {sale.customer_name || 'Unknown Customer'}
+                        </Typography>
+                        <Chip
+                          label={getStatusDisplay(sale.status)}
+                          color={getStatusColor(sale.status)}
+                          size="small"
+                          sx={{ mr: 1 }}
+                        />
+                        {sale.priority && (
+                          <Chip
+                            label={sale.priority_display || sale.priority}
+                            color={sale.priority === 'HIGH' ? 'error' : sale.priority === 'LOW' ? 'success' : 'warning'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ textAlign: 'right' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                          {formatCurrency(parseFloat(sale.amount) || 0)}
+                        </Typography>
+                        {sale.expected_close_date && (
+                          <Typography variant="caption" color="text.secondary">
+                            Expected: {formatDate(sale.expected_close_date)}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                    
+                    {/* Progress bar based on status */}
+                    <Box sx={{ mt: 1 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={
+                          sale.status === 'NEW' ? 20 :
+                          sale.status === 'CONTACTED' ? 40 :
+                          sale.status === 'PROPOSAL' ? 60 :
+                          sale.status === 'NEGOTIATION' ? 80 : 0
+                        }
+                        sx={{
+                          height: 4,
+                          borderRadius: 2,
+                          bgcolor: 'action.hover',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 2,
+                            bgcolor: 
+                              sale.status === 'NEW' ? 'info.main' :
+                              sale.status === 'CONTACTED' ? 'primary.main' :
+                              sale.status === 'PROPOSAL' ? 'warning.main' :
+                              sale.status === 'NEGOTIATION' ? 'secondary.main' : 'grey.400'
+                          }
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <SalesIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+              <Typography color="text.secondary">
+                No sales opportunities found
+              </Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (dashboardData.loading) {
     return (
@@ -628,31 +931,13 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Data Tables */}
+      {/* Revenue Analytics & Sales Opportunities */}
       <Grid container spacing={3}>
         <Grid item xs={12} lg={6}>
-          <DataTableCard
-            title="Top Customers"
-            data={dashboardData.customers}
-            loading={dashboardData.loading}
-            emptyMessage="No customers found"
-            icon={<PeopleIcon />}
-            color="primary"
-            columns={customerColumns}
-            renderRow={renderCustomerRow}
-          />
+          <RevenueAnalyticsCard />
         </Grid>
         <Grid item xs={12} lg={6}>
-          <DataTableCard
-            title="Recent Tasks"
-            data={dashboardData.tasks}
-            loading={dashboardData.loading}
-            emptyMessage="No tasks found"
-            icon={<TaskIcon />}
-            color="secondary"
-            columns={taskColumns}
-            renderRow={renderTaskRow}
-          />
+          <TopSalesOpportunitiesCard />
         </Grid>
       </Grid>
     </Box>

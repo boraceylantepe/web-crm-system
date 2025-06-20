@@ -66,39 +66,27 @@ class UserSerializer(DynamicFieldsModelSerializer):
     
     def update(self, instance, validated_data):
         """Update a user, set the password correctly and handle permission checks."""
-        # Add debug logging
-        request_user = self.context['request'].user
-        print(f"UserSerializer.update called by {request_user.username} (role={request_user.role})")
-        print(f"Updating user: {instance.username} (role={instance.role})")
-        print(f"Data received: {validated_data}")
-        
         # Handle password
         password = validated_data.pop('password', None)
         
         # Get the current user from context
-        # request_user was defined above for debugging
+        request_user = self.context['request'].user
         
         # Handle sensitive fields
         if request_user.role != 'ADMIN':
             # Non-admins can't change role, is_staff, is_active, etc.
             if 'role' in validated_data:
-                print(f"Removing 'role' from data - not allowed for {request_user.role}")
                 validated_data.pop('role')
             if 'is_staff' in validated_data:
-                print(f"Removing 'is_staff' from data - not allowed for {request_user.role}")
                 validated_data.pop('is_staff')
             if 'is_active' in validated_data:
-                print(f"Removing 'is_active' from data - not allowed for {request_user.role}")
                 validated_data.pop('is_active')
             if 'force_password_change' in validated_data:
-                print(f"Removing 'force_password_change' from data - not allowed for {request_user.role}")
                 validated_data.pop('force_password_change')
             if 'session_timeout' in validated_data:
-                print(f"Removing 'session_timeout' from data - not allowed for {request_user.role}")
                 validated_data.pop('session_timeout')
         
         # Update user fields
-        print(f"Remaining fields to update: {validated_data}")
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
@@ -116,7 +104,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
                 instance.is_staff = False
         
         instance.save()
-        print(f"User {instance.username} updated successfully")
         return instance
 
 class PasswordChangeSerializer(serializers.Serializer):

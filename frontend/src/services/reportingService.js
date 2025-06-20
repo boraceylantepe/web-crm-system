@@ -5,6 +5,12 @@ const API_BASE_URL = 'http://localhost:8000/api/reporting';
 // Create axios instance with interceptors for authentication
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000, // 30 second timeout
+  headers: {
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  }
 });
 
 // Add auth token to requests
@@ -47,37 +53,267 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Analytics API calls
+// Enhanced Analytics API calls with better error handling
 export const analyticsAPI = {
-  // Get dashboard KPIs
-  getDashboardKPIs: () => apiClient.get('/analytics/dashboard_kpis/'),
+  // Get dashboard KPIs with enhanced error handling and cache-busting
+  getDashboardKPIs: async (params = {}) => {
+    try {
+      // Add cache-busting parameter and any other params
+      const requestParams = {
+        ...params,
+        _t: new Date().getTime() // Cache-busting timestamp
+      };
+      
+      const response = await apiClient.get('/analytics/dashboard_kpis/', { params: requestParams });
+      return {
+        data: response.data,
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching dashboard KPIs:', error);
+      return {
+        data: {
+          sales: { total_amount: 0, total_sales: 0, won_sales: 0, win_rate: 0 },
+          customers: { total_customers: 0, new_this_month: 0 },
+          tasks: { completed_tasks: 0, completion_rate: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load dashboard data'
+      };
+    }
+  },
   
-  // Get sales performance data
-  getSalesPerformance: (params = {}) => 
-    apiClient.get('/analytics/sales_performance/', { params }),
+  // Get sales performance data with fallback
+  getSalesPerformance: async (params = {}) => {
+    try {
+      // Ensure cache-busting parameter exists
+      const requestParams = {
+        ...params,
+        _t: params._t || new Date().getTime()
+      };
+      
+      const response = await apiClient.get('/analytics/sales_performance/', { params: requestParams });
+      return {
+        data: {
+          sales_over_time: response.data.sales_over_time || [],
+          sales_by_status: response.data.sales_by_status || [],
+          sales_by_priority: response.data.sales_by_priority || [],
+          summary: response.data.summary || {}
+        },
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching sales performance:', error);
+      return {
+        data: {
+          sales_over_time: [],
+          sales_by_status: [],
+          sales_by_priority: [],
+          summary: { total_sales: 0, total_amount: 0, won_sales: 0, win_rate: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load sales data'
+      };
+    }
+  },
   
-  // Get customer engagement data
-  getCustomerEngagement: (params = {}) => 
-    apiClient.get('/analytics/customer_engagement/', { params }),
+  // Get customer engagement data with fallback
+  getCustomerEngagement: async (params = {}) => {
+    try {
+      // Ensure cache-busting parameter exists
+      const requestParams = {
+        ...params,
+        _t: params._t || new Date().getTime()
+      };
+      
+      const response = await apiClient.get('/analytics/customer_engagement/', { params: requestParams });
+      return {
+        data: {
+          customer_status: response.data.customer_status || [],
+          engagement_levels: response.data.engagement_levels || [],
+          acquisition_over_time: response.data.acquisition_over_time || [],
+          regional_distribution: response.data.regional_distribution || [],
+          summary: response.data.summary || {}
+        },
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching customer engagement:', error);
+      return {
+        data: {
+          customer_status: [],
+          engagement_levels: [],
+          acquisition_over_time: [],
+          regional_distribution: [],
+          summary: { total_customers: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load customer data'
+      };
+    }
+  },
   
-  // Get task completion data
-  getTaskCompletion: (params = {}) => 
-    apiClient.get('/analytics/task_completion/', { params }),
+  // Get task completion data with fallback
+  getTaskCompletion: async (params = {}) => {
+    try {
+      // Ensure cache-busting parameter exists
+      const requestParams = {
+        ...params,
+        _t: params._t || new Date().getTime()
+      };
+      
+      const response = await apiClient.get('/analytics/task_completion/', { params: requestParams });
+      return {
+        data: {
+          completion_over_time: response.data.completion_over_time || [],
+          task_by_priority: response.data.task_by_priority || [],
+          task_by_status: response.data.task_by_status || [],
+          summary: response.data.summary || {}
+        },
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching task completion:', error);
+      return {
+        data: {
+          completion_over_time: [],
+          task_by_priority: [],
+          task_by_status: [],
+          summary: { completed_tasks: 0, total_tasks: 0, completion_rate: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load task data'
+      };
+    }
+  },
   
   // Get conversion ratios
-  getConversionRatios: (params = {}) => 
-    apiClient.get('/analytics/conversion_ratios/', { params }),
+  getConversionRatios: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/analytics/conversion_ratios/', { params });
+      return {
+        data: response.data,
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching conversion ratios:', error);
+      return {
+        data: {},
+        success: false,
+        error: error.response?.data?.message || 'Failed to load conversion data'
+      };
+    }
+  },
   
   // Get user activity data (for managers)
-  getUserActivity: (params = {}) => 
-    apiClient.get('/analytics/user_activity/', { params }),
+  getUserActivity: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/analytics/user_activity/', { params });
+      return {
+        data: response.data,
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching user activity:', error);
+      return {
+        data: {},
+        success: false,
+        error: error.response?.data?.message || 'Failed to load user activity data'
+      };
+    }
+  },
+  
+  // Get user sales performance data (managers/admins only)
+  getUserSalesPerformance: async (params = {}) => {
+    try {
+      // Ensure cache-busting parameter exists
+      const requestParams = {
+        ...params,
+        _t: params._t || new Date().getTime()
+      };
+      
+      const response = await apiClient.get('/analytics/user_sales_performance/', { params: requestParams });
+      return {
+        data: {
+          users: response.data.users || [],
+          summary: response.data.summary || {}
+        },
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching user sales performance:', error);
+      return {
+        data: {
+          users: [],
+          summary: { total_users: 0, total_revenue: 0, total_deals: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load user sales performance data'
+      };
+    }
+  },
+  
+  // Get user task performance data (managers/admins only)
+  getUserTaskPerformance: async (params = {}) => {
+    try {
+      // Ensure cache-busting parameter exists
+      const requestParams = {
+        ...params,
+        _t: params._t || new Date().getTime()
+      };
+      
+      const response = await apiClient.get('/analytics/user_task_performance/', { params: requestParams });
+      return {
+        data: {
+          users: response.data.users || [],
+          summary: response.data.summary || {}
+        },
+        success: true
+      };
+    } catch (error) {
+      console.error('Error fetching user task performance:', error);
+      return {
+        data: {
+          users: [],
+          summary: { total_users: 0, total_tasks: 0, total_completed: 0 }
+        },
+        success: false,
+        error: error.response?.data?.message || 'Failed to load user task performance data'
+      };
+    }
+  },
   
   // Clear analytics cache
-  clearCache: () => apiClient.post('/analytics/clear_cache/'),
+  clearCache: async () => {
+    try {
+      await apiClient.post('/analytics/clear_cache/');
+      return { success: true };
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to clear cache'
+      };
+    }
+  },
   
   // Generate custom report
-  generateCustomReport: (data) => 
-    apiClient.post('/analytics/custom_report/', data),
+  generateCustomReport: async (data) => {
+    try {
+      const response = await apiClient.post('/analytics/custom_report/', data);
+      return {
+        data: response.data,
+        success: true
+      };
+    } catch (error) {
+      console.error('Error generating custom report:', error);
+      return {
+        data: {},
+        success: false,
+        error: error.response?.data?.message || 'Failed to generate report'
+      };
+    }
+  }
 };
 
 // Report Templates API calls
@@ -205,223 +441,88 @@ export const reportSchedulesAPI = {
   // Toggle schedule active status
   toggleSchedule: (id) => apiClient.post(`/schedules/${id}/toggle_active/`),
   
-  // Run schedule immediately
+  // Run schedule now
   runNow: (id) => apiClient.post(`/schedules/${id}/run_now/`),
 };
 
-// Report Shares API calls
-export const reportSharesAPI = {
-  // Get all shares
-  getShares: () => apiClient.get('/shares/'),
-  
-  // Get specific share
-  getShare: (id) => apiClient.get(`/shares/${id}/`),
-  
-  // Access shared report
-  accessReport: (id) => apiClient.get(`/shares/${id}/access_report/`),
-  
-  // Create new share
-  createShare: (data) => apiClient.post('/shares/', data),
-  
-  // Update share
-  updateShare: (id, data) => apiClient.put(`/shares/${id}/`, data),
-  
-  // Delete share
-  deleteShare: (id) => apiClient.delete(`/shares/${id}/`),
-};
-
-// Real-time updates API
-export const realtimeAPI = {
-  // Get real-time dashboard updates
-  getDashboardUpdates: () => apiClient.get('/realtime/dashboard_updates/'),
-  
-  // Subscribe to real-time updates (WebSocket would be implemented here)
-  subscribeToUpdates: (callback) => {
-    // WebSocket implementation would go here
-    console.log('WebSocket subscription not yet implemented');
-    return {
-      disconnect: () => console.log('WebSocket disconnected')
-    };
-  },
-  
-  // Get live KPI updates
-  getLiveKPIs: () => apiClient.get('/realtime/live_kpis/'),
-};
-
-// Advanced filtering API
-export const filteringAPI = {
-  // Get available filter options
-  getFilterOptions: (reportType) => 
-    apiClient.get(`/filters/options/${reportType}/`),
-  
-  // Apply complex filters
-  applyFilters: (reportType, filters) => 
-    apiClient.post(`/filters/apply/${reportType}/`, { filters }),
-  
-  // Save filter preset
-  saveFilterPreset: (data) => apiClient.post('/filters/presets/', data),
-  
-  // Get saved filter presets
-  getFilterPresets: () => apiClient.get('/filters/presets/'),
-  
-  // Delete filter preset
-  deleteFilterPreset: (id) => apiClient.delete(`/filters/presets/${id}/`),
-};
-
-// Performance optimization API
-export const performanceAPI = {
-  // Get performance metrics
-  getPerformanceMetrics: () => apiClient.get('/performance/metrics/'),
-  
-  // Optimize query performance
-  optimizeQuery: (queryData) => 
-    apiClient.post('/performance/optimize_query/', queryData),
-  
-  // Get cache statistics
-  getCacheStats: () => apiClient.get('/performance/cache_stats/'),
-  
-  // Preload data for better performance
-  preloadData: (dataType, params) => 
-    apiClient.post('/performance/preload/', { dataType, params }),
-};
-
 // Utility functions
-export const exportUtils = {
-  // Download CSV file
-  downloadCSV: async (reportId, filename = 'report.csv') => {
+export const utilsAPI = {
+  // Download CSV function that triggers file download
+  downloadCSV: async (reportId, filename) => {
     try {
-      const response = await generatedReportsAPI.exportCSV(reportId);
+      const response = await apiClient.get(`/reports/${reportId}/export_csv/`, {
+        responseType: 'blob'
+      });
+      
+      // Create blob link to download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      
+      // Clean up
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      return { success: true };
     } catch (error) {
       console.error('Error downloading CSV:', error);
-      throw error;
+      throw new Error(error.response?.data?.message || 'Failed to download CSV');
     }
   },
   
-  // Download PDF file
-  downloadPDF: async (reportId, filename = 'report.pdf') => {
+  // Download PDF function (for future implementation)
+  downloadPDF: async (reportId, filename) => {
     try {
-      const response = await generatedReportsAPI.exportPDF(reportId);
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const response = await apiClient.get(`/reports/${reportId}/export_pdf/`, {
+        responseType: 'blob'
+      });
+      
+      // Create blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      
+      // Clean up
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      return { success: true };
     } catch (error) {
       console.error('Error downloading PDF:', error);
-      throw error;
+      throw new Error(error.response?.data?.message || 'Failed to download PDF');
     }
-  },
-  
-  // Export dashboard as image
-  exportDashboardImage: async (elementId, filename = 'dashboard.png') => {
-    try {
-      const html2canvas = await import('html2canvas');
-      const element = document.getElementById(elementId);
-      const canvas = await html2canvas.default(element);
-      
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = canvas.toDataURL();
-      link.click();
-    } catch (error) {
-      console.error('Error exporting dashboard image:', error);
-      throw error;
-    }
-  },
-  
-  // Format date for API calls
-  formatDateForAPI: (date) => {
-    return date ? date.toISOString() : null;
-  },
-  
-  // Parse date range for filters
-  parseDateRange: (startDate, endDate) => ({
-    start: exportUtils.formatDateForAPI(startDate),
-    end: exportUtils.formatDateForAPI(endDate)
-  }),
-  
-  // Format numbers for display
-  formatNumber: (num, precision = 2) => {
-    if (num === null || num === undefined) return '0';
-    return Number(num).toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: precision
-    });
-  },
-  
-  // Format currency
-  formatCurrency: (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount || 0);
-  },
-  
-  // Format percentage
-  formatPercentage: (value, precision = 1) => {
-    return `${(value || 0).toFixed(precision)}%`;
-  },
-  
-  // Debounce function for search/filter inputs
-  debounce: (func, wait) => {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
+  }
+};
+
+// Utility function for debouncing API calls
+export const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
       clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
+      func(...args);
     };
-  },
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 };
 
-// Notification utilities
-export const notificationUtils = {
-  // Show success notification
-  showSuccess: (message) => {
-    // This would integrate with a notification library
-    console.log('Success:', message);
-  },
-  
-  // Show error notification
-  showError: (message) => {
-    console.error('Error:', message);
-  },
-  
-  // Show info notification
-  showInfo: (message) => {
-    console.log('Info:', message);
-  },
-  
-  // Show warning notification
-  showWarning: (message) => {
-    console.warn('Warning:', message);
-  },
-};
-
-export default {
+// Main reporting service object
+const reportingService = {
   analytics: analyticsAPI,
   templates: reportTemplatesAPI,
   reports: generatedReportsAPI,
   widgets: dashboardWidgetsAPI,
-  dashboard: userDashboardAPI,
+  dashboards: userDashboardAPI,
   schedules: reportSchedulesAPI,
-  shares: reportSharesAPI,
-  realtime: realtimeAPI,
-  filtering: filteringAPI,
-  performance: performanceAPI,
-  utils: exportUtils,
-  notifications: notificationUtils,
-}; 
+  utils: utilsAPI,
+  debounce
+};
+
+export default reportingService; 

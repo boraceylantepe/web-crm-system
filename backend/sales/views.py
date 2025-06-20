@@ -217,21 +217,28 @@ def sales_stats(request):
     Endpoint to get sales statistics with role-based filtering
     """
     try:
+        print(f"📊 DEBUG: Fetching stats for user {request.user.username} (role: {request.user.role})")
+        
         # Simple stats with role-based filtering
         all_sales = Sale.objects.all()
         
         # Apply role-based filtering
         if request.user.role == 'USER':
             all_sales = all_sales.filter(assigned_to=request.user)
+            
+        print(f"📈 DEBUG: Total sales in query: {all_sales.count()}")
+        
         result = {
             'total_count': all_sales.count(),
             'total_value': float(all_sales.aggregate(Sum('amount'))['amount__sum'] or 0),
             'status_counts': {}
         }
         
-        # Count by status
+        # Count by status with detailed logging
         for status_code, status_name in Sale.STATUS_CHOICES:
-            result['status_counts'][status_code] = all_sales.filter(status=status_code).count()
+            count = all_sales.filter(status=status_code).count()
+            result['status_counts'][status_code] = count
+            print(f"🏷️  DEBUG: Status {status_code}: {count} sales")
         
         # Get task stats from the task service
         try:
@@ -256,10 +263,10 @@ def sales_stats(request):
         # For now, just set a placeholder value
         result['upcoming_events'] = 0
         
-        print("DEBUG: Stats result", result)
+        print(f"✅ DEBUG: Final stats result: {result}")
         return Response(result)
     except Exception as e:
-        print(f"DEBUG ERROR in stats: {str(e)}")
+        print(f"❌ DEBUG ERROR in stats: {str(e)}")
         import traceback
         print(traceback.format_exc())
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -407,6 +414,8 @@ def update_sale_status(request, pk):
         sale = Sale.objects.get(pk=pk)
         new_status = request.data.get('status')
         
+        print(f"🔄 DEBUG: Updating sale {pk} status from {sale.status} to {new_status}")
+        
         if not new_status:
             return Response(
                 {'error': 'Status is required'}, 
@@ -426,6 +435,9 @@ def update_sale_status(request, pk):
         sale.status = new_status
         sale.save()
         
+        print(f"✅ DEBUG: Sale {pk} status updated from {old_status} to {new_status}")
+        print(f"📝 DEBUG: Sale object after save - ID: {sale.id}, Status: {sale.status}")
+        
         # Create a note about the status change
         SaleNote.objects.create(
             sale=sale,
@@ -441,7 +453,7 @@ def update_sale_status(request, pk):
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
-        print(f"Error updating sale status: {e}")
+        print(f"❌ Error updating sale status: {e}")
         return Response(
             {'error': str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

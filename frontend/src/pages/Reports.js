@@ -39,7 +39,6 @@ import {
   Add as AddIcon,
   PlayArrow as PlayIcon,
   Download as DownloadIcon,
-  Share as ShareIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   FileCopy as CopyIcon,
@@ -255,12 +254,7 @@ const Reports = () => {
 
   const handleDownloadReport = async (reportId, reportName, format = 'csv') => {
     try {
-      if (format === 'csv') {
-        await reportingService.utils.downloadCSV(reportId, `${reportName}.csv`);
-      } else if (format === 'pdf') {
-        // PDF download would be implemented here
-        console.log('PDF download not yet implemented');
-      }
+      await reportingService.utils.downloadCSV(reportId, `${reportName}.csv`);
       handleCloseActionMenu();
     } catch (error) {
       console.error('Error downloading report:', error);
@@ -635,14 +629,6 @@ const Reports = () => {
         <MenuItem key="download-csv" onClick={() => handleDownloadReport(selectedItem.id, selectedItem.template.name, 'csv')}>
           <GetAppIcon sx={{ mr: 1 }} fontSize="small" />
           Download CSV
-        </MenuItem>,
-        <MenuItem key="download-pdf" onClick={() => handleDownloadReport(selectedItem.id, selectedItem.template.name, 'pdf')}>
-          <GetAppIcon sx={{ mr: 1 }} fontSize="small" />
-          Download PDF
-        </MenuItem>,
-        <MenuItem key="share" onClick={handleCloseActionMenu}>
-          <ShareIcon sx={{ mr: 1 }} fontSize="small" />
-          Share Report
         </MenuItem>
       ]}
 

@@ -273,6 +273,20 @@ const Sales = () => {
         return newPipeline;
       });
 
+      // Optimistically update Won Opportunities count
+      setStats(prevStats => {
+        if (!prevStats || !prevStats.status_counts) return prevStats;
+        const newStats = { ...prevStats, status_counts: { ...prevStats.status_counts } };
+        if (currentStatus !== 'WON' && newStatus === 'WON') {
+          // Bir fırsat WON'a taşındı
+          newStats.status_counts.WON = (newStats.status_counts.WON || 0) + 1;
+        } else if (currentStatus === 'WON' && newStatus !== 'WON') {
+          // Bir fırsat WON'dan çıkarıldı
+          newStats.status_counts.WON = Math.max(0, (newStats.status_counts.WON || 1) - 1);
+        }
+        return newStats;
+      });
+
       await updateSaleStatus(saleId, newStatus);
       // Fetch stats, as totals might have changed, but pipeline is updated locally
       fetchSalesStats();
@@ -306,8 +320,9 @@ const Sales = () => {
         });
 
         await deleteSale(saleId);
-        // Refresh stats after deletion
+        // Refresh both stats and pipeline after deletion
         fetchSalesStats();
+        fetchSalesPipeline();
       } catch (err) {
         console.error('Error deleting sale:', err);
         setError('Failed to delete opportunity. Please try again.');

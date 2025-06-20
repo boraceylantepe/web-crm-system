@@ -282,56 +282,47 @@ const Users = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sortedUsers.map((user) => (
-                        <TableRow key={user.id}>
+                      sortedUsers.map((u) => (
+                        <TableRow key={u.id}>
                           <TableCell>
-                            {user.first_name} {user.last_name}
+                            {u.first_name} {u.last_name}
                           </TableCell>
-                          <TableCell>{user.email}</TableCell>
+                          <TableCell>{u.email}</TableCell>
                           <TableCell>
                             <Chip 
-                              label={user.role_display || user.role} 
-                              color={getRoleChipColor(user.role)}
+                              label={u.role_display || u.role} 
+                              color={getRoleChipColor(u.role)}
                               size="small"
                             />
                           </TableCell>
                           <TableCell>
                             <Chip 
-                              label={user.is_active ? "Active" : "Inactive"} 
-                              color={user.is_active ? "success" : "default"}
+                              label={u.is_active ? "Active" : "Inactive"} 
+                              color={u.is_active ? "success" : "default"}
                               size="small"
                             />
                           </TableCell>
                           <TableCell align="right">
-                            {user.role === 'ADMIN' && user.id !== user.id ? (
-                              <Typography variant="caption" color="text.secondary">
-                                Admin user
-                              </Typography>
-                            ) : (
-                              <>
-                                <IconButton 
-                                  component={Link} 
-                                  to={`/users/edit/${user.id}`}
-                                  color="primary"
-                                  size="small"
-                                  disabled={
-                                    (user.role === 'ADMIN' && user.id !== user.id) || 
-                                    (!isAdmin && (user.role === 'MANAGER' || user.role === 'ADMIN'))
-                                  }
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                                {((isAdmin) || (!isAdmin && user.role !== 'MANAGER' && user.role !== 'ADMIN')) && 
-                                 user.role !== 'ADMIN' && user.id !== user.id && (
-                                  <IconButton 
-                                    onClick={() => handleDeleteClick(user.id)}
-                                    color="error"
-                                    size="small"
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                              </>
+                            <IconButton 
+                              component={Link} 
+                              to={`/users/edit/${u.id}`}
+                              color="primary"
+                              size="small"
+                              disabled={
+                                (u.role === 'ADMIN' && u.id !== user?.id) || 
+                                (!isAdmin && (u.role === 'MANAGER' || u.role === 'ADMIN'))
+                              }
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            {isAdmin && u.role !== 'ADMIN' && u.id !== user?.id && (
+                              <IconButton 
+                                onClick={() => handleDeleteClick(u.id)}
+                                color="error"
+                                size="small"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
                             )}
                           </TableCell>
                         </TableRow>

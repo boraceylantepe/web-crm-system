@@ -81,9 +81,17 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     def _get_task_events(self, user):
         """Convert tasks to calendar events format"""
         # Get tasks assigned to the user or visible to them based on role
-        if hasattr(user, 'role') and user.role in ['ADMIN', 'MANAGER']:
+        # This matches the logic from tasks/views.py TaskListCreateView
+        if hasattr(user, 'role') and user.role == 'ADMIN':
+            # Admins can see all tasks
             tasks = Task.objects.all()
+        elif hasattr(user, 'role') and user.role == 'MANAGER':
+            # Managers can see tasks assigned to them AND tasks they created/assigned
+            tasks = Task.objects.filter(
+                Q(assigned_to=user) | Q(created_by=user)
+            ).distinct()
         else:
+            # Users can only see tasks assigned to them
             tasks = Task.objects.filter(assigned_to=user)
         
         print(f"Found {tasks.count()} tasks to add to calendar")
@@ -99,14 +107,30 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             # Format dates as ISO strings for JSON serialization
             due_date_str = task.due_date.isoformat()
             
-            # Set color based on priority and status
-            color = '#757575'  # Default gray
+            # Set color based on task status (status takes priority over priority)
+            # Color scheme:
+            # - Red: Overdue tasks (urgent attention)
+            # - Green: Completed tasks (success)
+            # - Blue: In Progress tasks (active work)
+            # - Orange: High priority pending tasks
+            # - Purple: Medium priority pending tasks  
+            # - Gray: Low priority pending tasks or unknown status
             if task.status == 'O':  # Overdue
-                color = '#d32f2f'  # Red
+                color = '#d32f2f'  # Red - Urgent attention needed
             elif task.status == 'C':  # Completed
-                color = '#388e3c'  # Green
-            elif task.priority == 'H':  # High priority
-                color = '#f57c00'  # Orange
+                color = '#388e3c'  # Green - Success
+            elif task.status == 'IP':  # In Progress
+                color = '#2196f3'  # Blue - Active work
+            elif task.status == 'P':  # Pending
+                # For pending tasks, use priority to determine color
+                if task.priority == 'H':  # High priority
+                    color = '#ff9800'  # Orange - Important pending
+                elif task.priority == 'M':  # Medium priority
+                    color = '#9c27b0'  # Purple - Normal pending
+                else:  # Low priority
+                    color = '#757575'  # Gray - Low priority pending
+            else:
+                color = '#757575'  # Default gray for unknown status
             
             task_events.append({
                 'id': f"task_{task.id}",
@@ -136,9 +160,12 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     def _get_sale_events(self, user):
         """Convert sales expected close dates to calendar events format"""
         # Get sales assigned to the user or visible to them based on role
+        # This matches the logic from sales/views.py SaleViewSet
         if hasattr(user, 'role') and user.role in ['ADMIN', 'MANAGER']:
+            # Admins and managers can see all sales
             sales = Sale.objects.all()
         else:
+            # Users can only see sales assigned to them
             sales = Sale.objects.filter(assigned_to=user)
         
         # Only include sales with expected close dates
@@ -153,14 +180,22 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             # Format dates as ISO strings for JSON serialization
             close_date_str = sale.expected_close_date.isoformat()
             
-            # Set color based on priority and status
-            color = '#1976d2'  # Default blue
-            if sale.status == 'WON':
-                color = '#388e3c'  # Green
+            # Set color based on sale status to match kanban board colors
+            # Color scheme matches frontend/src/pages/Sales.js kanban board
+            if sale.status == 'NEW':
+                color = '#1976d2'  # Blue
+            elif sale.status == 'CONTACTED':
+                color = '#03a9f4'  # Light Blue  
+            elif sale.status == 'PROPOSAL':
+                color = '#ff9800'  # Orange
+            elif sale.status == 'NEGOTIATION':
+                color = '#9c27b0'  # Purple
+            elif sale.status == 'WON':
+                color = '#4caf50'  # Green
             elif sale.status == 'LOST':
-                color = '#d32f2f'  # Red
-            elif sale.priority == 'HIGH':
-                color = '#f57c00'  # Orange
+                color = '#f44336'  # Red
+            else:
+                color = '#1976d2'  # Default blue for unknown status
             
             sale_events.append({
                 'id': f"sale_{sale.id}",

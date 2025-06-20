@@ -77,8 +77,7 @@ const Customers = () => {
     region: '',
     engagement_level: '',
     status: '',
-    is_active: 'all',
-    time_period: 'all'
+    is_active: 'all'
   });
   
   // Pagination
@@ -96,7 +95,7 @@ const Customers = () => {
   
   useEffect(() => {
     fetchCustomers();
-  }, [filters, page, rowsPerPage]);
+  }, [filters, page, rowsPerPage, searchQuery]);
   
   const fetchCustomers = async () => {
     setLoading(true);
@@ -114,17 +113,18 @@ const Customers = () => {
         }
       });
       
-      // Use search endpoint if a search query exists
+      // Add search parameter if search query exists
       if (searchQuery.trim()) {
-        params.q = searchQuery.trim();
-        const data = await searchCustomers(params);
-        setCustomers(Array.isArray(data.results) ? data.results : data);
-        setTotalCount(data.count || data.length || 0);
-      } else {
-        const data = await getCustomers(params);
-        setCustomers(Array.isArray(data.results) ? data.results : data);
-        setTotalCount(data.count || data.length || 0);
+        params.search = searchQuery.trim();
       }
+      
+      // Use the appropriate endpoint based on whether we need advanced search
+      const data = searchQuery.trim() 
+        ? await searchCustomers(params)
+        : await getCustomers(params);
+        
+      setCustomers(Array.isArray(data.results) ? data.results : data);
+      setTotalCount(data.count || data.length || 0);
     } catch (err) {
       setError('Failed to fetch customers. Please try again.');
       console.error('Error fetching customers:', err);
@@ -153,11 +153,11 @@ const Customers = () => {
       region: '',
       engagement_level: '',
       status: '',
-      is_active: 'all',
-      time_period: 'all'
+      is_active: 'all'
     });
     setSearchQuery('');
     setPage(0);
+    // The useEffect will automatically trigger fetchCustomers when filters and searchQuery change
   };
   
   const handleChangePage = (event, newPage) => {
@@ -249,20 +249,21 @@ const Customers = () => {
   };
   
   const getEngagementLevelColor = (level) => {
-    switch(level?.toLowerCase()) {
-      case 'high': return 'success';
-      case 'medium': return 'warning';
-      case 'low': return 'error';
+    switch(level?.toUpperCase()) {
+      case 'HIGH': return 'success';
+      case 'MEDIUM': return 'warning';
+      case 'LOW': return 'error';
+      case 'VIP': return 'primary';
       default: return 'default';
     }
   };
   
   const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'active': return 'success';
-      case 'inactive': return 'default';
-      case 'prospect': return 'info';
-      case 'lead': return 'warning';
+    switch(status?.toUpperCase()) {
+      case 'ACTIVE': return 'success';
+      case 'INACTIVE': return 'default';
+      case 'PROSPECT': return 'info';
+      case 'LEAD': return 'warning';
       default: return 'default';
     }
   };
@@ -309,8 +310,8 @@ const Customers = () => {
       <Card elevation={0} sx={{ border: 1, borderColor: 'divider', mb: 3 }}>
         <CardContent>
           <Grid container spacing={3} alignItems="center">
-            {/* Search Bar */}
-            <Grid item xs={12} md={4}>
+                        {/* Search Bar */}
+            <Grid item xs={12} md={6}>
             <TextField
               fullWidth
                 size="small"
@@ -339,24 +340,6 @@ const Customers = () => {
                   ),
               }}
             />
-            </Grid>
-
-            {/* Time Period Filter */}
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={filters.time_period}
-                  onChange={handleFilterChange}
-                  name="time_period"
-                  displayEmpty
-                >
-                  <MenuItem value="all">All Time</MenuItem>
-                  <MenuItem value="today">Today</MenuItem>
-                  <MenuItem value="this_week">This Week</MenuItem>
-                  <MenuItem value="this_month">This Month</MenuItem>
-                  <MenuItem value="last_month">Last Month</MenuItem>
-                </Select>
-              </FormControl>
             </Grid>
 
             {/* Advanced Filters Toggle */}
@@ -411,10 +394,13 @@ const Customers = () => {
                     name="region"
                     >
                     <MenuItem value="">All Regions</MenuItem>
-                    <MenuItem value="north">North</MenuItem>
-                    <MenuItem value="south">South</MenuItem>
-                    <MenuItem value="east">East</MenuItem>
-                    <MenuItem value="west">West</MenuItem>
+                    <MenuItem value="NA">North America</MenuItem>
+                    <MenuItem value="EU">Europe</MenuItem>
+                    <MenuItem value="APAC">Asia Pacific</MenuItem>
+                    <MenuItem value="LATAM">Latin America</MenuItem>
+                    <MenuItem value="MENA">Middle East & North Africa</MenuItem>
+                    <MenuItem value="AF">Africa</MenuItem>
+                    <MenuItem value="OTHER">Other</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -429,9 +415,10 @@ const Customers = () => {
                     name="engagement_level"
                     >
                     <MenuItem value="">All Levels</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="HIGH">High</MenuItem>
+                    <MenuItem value="MEDIUM">Medium</MenuItem>
+                    <MenuItem value="LOW">Low</MenuItem>
+                    <MenuItem value="VIP">VIP</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -446,9 +433,10 @@ const Customers = () => {
                     name="status"
                     >
                     <MenuItem value="">All Status</MenuItem>
-                    <MenuItem value="lead">Lead</MenuItem>
-                    <MenuItem value="prospect">Prospect</MenuItem>
-                    <MenuItem value="customer">Customer</MenuItem>
+                    <MenuItem value="LEAD">Lead</MenuItem>
+                    <MenuItem value="PROSPECT">Prospect</MenuItem>
+                    <MenuItem value="ACTIVE">Active</MenuItem>
+                    <MenuItem value="INACTIVE">Inactive</MenuItem>
                     </Select>
                   </FormControl>
               </Grid>
