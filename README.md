@@ -403,50 +403,8 @@ npm run test:coverage
 - **Frontend Performance**: Code splitting and lazy loading
 - **Monitoring**: Built-in performance monitoring and logging
 
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup for Contributors
-1. Follow the setup instructions above
-2. Install development dependencies:
-   ```bash
-   # Backend
-   pip install -r requirements-dev.txt
-   
-   # Frontend
-   npm install --include=dev
-   ```
-3. Run tests before submitting PRs
-4. Ensure code follows the established style guides
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
-
-For support and questions:
-- Create an issue in the GitHub repository
-- Check the documentation and API guides
-- Review existing issues for similar problems
-
-## 🚀 Deployment
-
-For production deployment:
-1. Set `DEBUG=False` in environment variables
-2. Configure proper PostgreSQL database
-3. Set up reverse proxy (Nginx)
-4. Use WSGI server (Gunicorn)
-5. Configure SSL certificates
-6. Set up monitoring and logging
-
----
-
-**Built with ❤️ using Django and React** 
